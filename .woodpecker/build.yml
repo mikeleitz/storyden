@@ -1,0 +1,24 @@
+when:
+  event:
+    - push
+    - manual
+  branch:
+    - main
+
+steps:
+  build-docker-image:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      repo: docker-private.mleitz1.com/forks/storyden
+      registry: docker-private.mleitz1.com
+      logins:
+        - registry: docker-private.mleitz1.com
+          username:
+            from_secret: nexus_woodpecker_username
+          password:
+            from_secret: nexus_woodpecker_password
+      dockerfile: docker/all/Dockerfile
+      platforms: linux/arm64/v8
+      tags:
+        - mleitz1-latest
+        - mleitz1-v1.26.10

@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="invalid_uploads">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/tests/plugin/test_data/invalid_uploads/03-zip-with-malformed-manifest.zip!/" />
+      <root url="jar://$PROJECT_DIR$/tests/plugin/test_data/invalid_uploads/01-garbage-not-zip.zip!/" />
+      <root url="jar://$PROJECT_DIR$/tests/plugin/test_data/invalid_uploads/02-zip-without-manifest.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
