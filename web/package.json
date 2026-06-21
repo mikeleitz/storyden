@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "v1.26.10-post",
+  "version": "v1.26.11-post",
   "private": true,
   "scripts": {
     "prepare": "panda codegen",
@@ -109,7 +109,7 @@
   },
   "packageManager": "pnpm@11.4.0",
   "engines": {
-    "node": "22.x"
+    "node": "24.x"
   },
   "browserslist": [
     "defaults and supports es6-module",

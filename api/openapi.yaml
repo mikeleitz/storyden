@@ -27,7 +27,7 @@ info:
     a more fixed versioning strategy in the future. Ultimately, the primary way
     Storyden tracks versions is dates, there are no set release tags currently.
   title: storyden
-  version: "v1.26.10-post"
+  version: "v1.26.11-post"
 
 servers:
   - url: "/api"
@@ -3457,7 +3457,7 @@ paths:
       description: Query and search content.
       tags: [datagraph]
       parameters:
-        - $ref: "#/components/parameters/RequiredSearchQuery"
+        - $ref: "#/components/parameters/SearchQuery"
         - $ref: "#/components/parameters/DatagraphKindQuery"
         - $ref: "#/components/parameters/DatagraphAuthorQuery"
         - $ref: "#/components/parameters/DatagraphCategoryQuery"
