@@ -21,4 +21,4 @@ steps:
       platforms: linux/arm64/v8
       tags:
         - mleitz1-latest
-        - mleitz1-v1.26.10
+        - mleitz1-v1.26.11
