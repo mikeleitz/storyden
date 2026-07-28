@@ -14,7 +14,6 @@ import (
 
 	"github.com/Southclaws/storyden/app/resources/account"
 	"github.com/Southclaws/storyden/app/resources/datagraph"
-	"github.com/Southclaws/storyden/app/resources/mark"
 	"github.com/Southclaws/storyden/app/resources/pagination"
 	"github.com/Southclaws/storyden/app/resources/post"
 	"github.com/Southclaws/storyden/app/resources/post/reply"
@@ -52,8 +51,10 @@ func serialiseAccount(acc *account.AccountWithEdges) openapi.Account {
 		UpdatedAt:      acc.UpdatedAt,
 		DeletedAt:      acc.DeletedAt.Ptr(),
 		Admin:          acc.Admin,
+		Kind:           openapi.AccountKind(acc.Kind.String()),
 		VerifiedStatus: serialiseAccountVerifiedStatus(acc.VerifiedStatus),
 		EmailAddresses: dt.Map(acc.EmailAddresses, serialiseEmailAddressPtr),
+		AuthServices:   dt.Map(acc.Auths, func(service string) openapi.AuthProviderIdentifier { return openapi.AuthProviderIdentifier(service) }),
 		Roles:          serialiseHeldRoleList(acc.Roles),
 		InvitedBy:      invitedBy.Ptr(),
 	}
@@ -280,10 +281,6 @@ func deserialiseVisibilityList(in []openapi.Visibility) ([]visibility.Visibility
 	}
 
 	return v, nil
-}
-
-func deserialiseMark(s string) mark.Queryable {
-	return mark.NewQueryKey(s)
 }
 
 func deserialiseOptionalFloat(in *float32) opt.Optional[float64] {

@@ -5,7 +5,7 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import type {
   AccessKeyCreateBody,
@@ -48,6 +48,8 @@ import type {
   OAuthJWKSOKResponse,
   OAuthProviderCallbackBody,
   OAuthRefreshTokenListOKResponse,
+  OAuthRemoteCallbackOKResponse,
+  OAuthRemoteCallbackParams,
   OAuthTokenBody,
   OAuthTokenOKResponse,
   OAuthUserInfoOKResponse,
@@ -864,6 +866,46 @@ export const oAuthUserInfo = async (
     ...options,
     method: "GET",
   });
+};
+
+/**
+ * Complete a remote OAuth authorization code callback. This validates the
+saved state, exchanges the code with PKCE, and stores returned tokens
+on the remote connection.
+
+ */
+export type oAuthRemoteCallbackResponse = {
+  data: OAuthRemoteCallbackOKResponse;
+  status: number;
+};
+
+export const getOAuthRemoteCallbackUrl = (
+  params: OAuthRemoteCallbackParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  return normalizedParams.size
+    ? `/oauth/remote/callback?${normalizedParams.toString()}`
+    : `/oauth/remote/callback`;
+};
+
+export const oAuthRemoteCallback = async (
+  params: OAuthRemoteCallbackParams,
+  options?: RequestInit,
+): Promise<oAuthRemoteCallbackResponse> => {
+  return fetcher<Promise<oAuthRemoteCallbackResponse>>(
+    getOAuthRemoteCallbackUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
 /**

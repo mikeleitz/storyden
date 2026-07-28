@@ -77,8 +77,6 @@ type AccountEdges struct {
 	InvitedBy *Invitation `json:"invited_by,omitempty"`
 	// Posts holds the value of the posts edge.
 	Posts []*Post `json:"posts,omitempty"`
-	// Questions holds the value of the questions edge.
-	Questions []*Question `json:"questions,omitempty"`
 	// Reacts holds the value of the reacts edge.
 	Reacts []*React `json:"reacts,omitempty"`
 	// Likes holds the value of the likes edge.
@@ -97,6 +95,8 @@ type AccountEdges struct {
 	OauthAuthorisationRequests []*OAuthAuthorisationRequest `json:"oauth_authorisation_requests,omitempty"`
 	// OauthRefreshTokens holds the value of the oauth_refresh_tokens edge.
 	OauthRefreshTokens []*OAuthRefreshToken `json:"oauth_refresh_tokens,omitempty"`
+	// OauthRemoteConnections holds the value of the oauth_remote_connections edge.
+	OauthRemoteConnections []*OAuthRemoteConnection `json:"oauth_remote_connections,omitempty"`
 	// ClaimedOauthDeviceAuthorisations holds the value of the claimed_oauth_device_authorisations edge.
 	ClaimedOauthDeviceAuthorisations []*OAuthDeviceAuthorisation `json:"claimed_oauth_device_authorisations,omitempty"`
 	// ApprovedOauthDeviceAuthorisations holds the value of the approved_oauth_device_authorisations edge.
@@ -129,11 +129,23 @@ type AccountEdges struct {
 	Warnings []*Warning `json:"warnings,omitempty"`
 	// AuthoredWarnings holds the value of the authored_warnings edge.
 	AuthoredWarnings []*Warning `json:"authored_warnings,omitempty"`
+	// Robots holds the value of the robots edge.
+	Robots []*Robot `json:"robots,omitempty"`
+	// RobotWorkspaces holds the value of the robot_workspaces edge.
+	RobotWorkspaces []*RobotWorkspace `json:"robot_workspaces,omitempty"`
+	// RobotWorkspaceInstances holds the value of the robot_workspace_instances edge.
+	RobotWorkspaceInstances []*RobotWorkspaceInstance `json:"robot_workspace_instances,omitempty"`
+	// RobotMcpServers holds the value of the robot_mcp_servers edge.
+	RobotMcpServers []*RobotMCPServer `json:"robot_mcp_servers,omitempty"`
+	// RobotSessions holds the value of the robot_sessions edge.
+	RobotSessions []*RobotSession `json:"robot_sessions,omitempty"`
+	// RobotMessages holds the value of the robot_messages edge.
+	RobotMessages []*RobotSessionMessage `json:"robot_messages,omitempty"`
 	// AccountRoles holds the value of the account_roles edge.
 	AccountRoles []*AccountRoles `json:"account_roles,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [37]bool
+	loadedTypes [43]bool
 }
 
 // SessionsOrErr returns the Sessions value or an error if the edge
@@ -228,19 +240,10 @@ func (e AccountEdges) PostsOrErr() ([]*Post, error) {
 	return nil, &NotLoadedError{edge: "posts"}
 }
 
-// QuestionsOrErr returns the Questions value or an error if the edge
-// was not loaded in eager-loading.
-func (e AccountEdges) QuestionsOrErr() ([]*Question, error) {
-	if e.loadedTypes[10] {
-		return e.Questions, nil
-	}
-	return nil, &NotLoadedError{edge: "questions"}
-}
-
 // ReactsOrErr returns the Reacts value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) ReactsOrErr() ([]*React, error) {
-	if e.loadedTypes[11] {
+	if e.loadedTypes[10] {
 		return e.Reacts, nil
 	}
 	return nil, &NotLoadedError{edge: "reacts"}
@@ -249,7 +252,7 @@ func (e AccountEdges) ReactsOrErr() ([]*React, error) {
 // LikesOrErr returns the Likes value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) LikesOrErr() ([]*LikePost, error) {
-	if e.loadedTypes[12] {
+	if e.loadedTypes[11] {
 		return e.Likes, nil
 	}
 	return nil, &NotLoadedError{edge: "likes"}
@@ -258,7 +261,7 @@ func (e AccountEdges) LikesOrErr() ([]*LikePost, error) {
 // MentionsOrErr returns the Mentions value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) MentionsOrErr() ([]*MentionProfile, error) {
-	if e.loadedTypes[13] {
+	if e.loadedTypes[12] {
 		return e.Mentions, nil
 	}
 	return nil, &NotLoadedError{edge: "mentions"}
@@ -267,7 +270,7 @@ func (e AccountEdges) MentionsOrErr() ([]*MentionProfile, error) {
 // RolesOrErr returns the Roles value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) RolesOrErr() ([]*Role, error) {
-	if e.loadedTypes[14] {
+	if e.loadedTypes[13] {
 		return e.Roles, nil
 	}
 	return nil, &NotLoadedError{edge: "roles"}
@@ -276,7 +279,7 @@ func (e AccountEdges) RolesOrErr() ([]*Role, error) {
 // AuthenticationOrErr returns the Authentication value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) AuthenticationOrErr() ([]*Authentication, error) {
-	if e.loadedTypes[15] {
+	if e.loadedTypes[14] {
 		return e.Authentication, nil
 	}
 	return nil, &NotLoadedError{edge: "authentication"}
@@ -285,7 +288,7 @@ func (e AccountEdges) AuthenticationOrErr() ([]*Authentication, error) {
 // OauthClientsOrErr returns the OauthClients value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) OauthClientsOrErr() ([]*OAuthClient, error) {
-	if e.loadedTypes[16] {
+	if e.loadedTypes[15] {
 		return e.OauthClients, nil
 	}
 	return nil, &NotLoadedError{edge: "oauth_clients"}
@@ -294,7 +297,7 @@ func (e AccountEdges) OauthClientsOrErr() ([]*OAuthClient, error) {
 // OauthAuthorisationCodesOrErr returns the OauthAuthorisationCodes value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) OauthAuthorisationCodesOrErr() ([]*OAuthAuthorisationCode, error) {
-	if e.loadedTypes[17] {
+	if e.loadedTypes[16] {
 		return e.OauthAuthorisationCodes, nil
 	}
 	return nil, &NotLoadedError{edge: "oauth_authorisation_codes"}
@@ -303,7 +306,7 @@ func (e AccountEdges) OauthAuthorisationCodesOrErr() ([]*OAuthAuthorisationCode,
 // OauthAuthorisationRequestsOrErr returns the OauthAuthorisationRequests value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) OauthAuthorisationRequestsOrErr() ([]*OAuthAuthorisationRequest, error) {
-	if e.loadedTypes[18] {
+	if e.loadedTypes[17] {
 		return e.OauthAuthorisationRequests, nil
 	}
 	return nil, &NotLoadedError{edge: "oauth_authorisation_requests"}
@@ -312,10 +315,19 @@ func (e AccountEdges) OauthAuthorisationRequestsOrErr() ([]*OAuthAuthorisationRe
 // OauthRefreshTokensOrErr returns the OauthRefreshTokens value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) OauthRefreshTokensOrErr() ([]*OAuthRefreshToken, error) {
-	if e.loadedTypes[19] {
+	if e.loadedTypes[18] {
 		return e.OauthRefreshTokens, nil
 	}
 	return nil, &NotLoadedError{edge: "oauth_refresh_tokens"}
+}
+
+// OauthRemoteConnectionsOrErr returns the OauthRemoteConnections value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) OauthRemoteConnectionsOrErr() ([]*OAuthRemoteConnection, error) {
+	if e.loadedTypes[19] {
+		return e.OauthRemoteConnections, nil
+	}
+	return nil, &NotLoadedError{edge: "oauth_remote_connections"}
 }
 
 // ClaimedOauthDeviceAuthorisationsOrErr returns the ClaimedOauthDeviceAuthorisations value or an error if the edge
@@ -462,10 +474,64 @@ func (e AccountEdges) AuthoredWarningsOrErr() ([]*Warning, error) {
 	return nil, &NotLoadedError{edge: "authored_warnings"}
 }
 
+// RobotsOrErr returns the Robots value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotsOrErr() ([]*Robot, error) {
+	if e.loadedTypes[36] {
+		return e.Robots, nil
+	}
+	return nil, &NotLoadedError{edge: "robots"}
+}
+
+// RobotWorkspacesOrErr returns the RobotWorkspaces value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotWorkspacesOrErr() ([]*RobotWorkspace, error) {
+	if e.loadedTypes[37] {
+		return e.RobotWorkspaces, nil
+	}
+	return nil, &NotLoadedError{edge: "robot_workspaces"}
+}
+
+// RobotWorkspaceInstancesOrErr returns the RobotWorkspaceInstances value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotWorkspaceInstancesOrErr() ([]*RobotWorkspaceInstance, error) {
+	if e.loadedTypes[38] {
+		return e.RobotWorkspaceInstances, nil
+	}
+	return nil, &NotLoadedError{edge: "robot_workspace_instances"}
+}
+
+// RobotMcpServersOrErr returns the RobotMcpServers value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotMcpServersOrErr() ([]*RobotMCPServer, error) {
+	if e.loadedTypes[39] {
+		return e.RobotMcpServers, nil
+	}
+	return nil, &NotLoadedError{edge: "robot_mcp_servers"}
+}
+
+// RobotSessionsOrErr returns the RobotSessions value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotSessionsOrErr() ([]*RobotSession, error) {
+	if e.loadedTypes[40] {
+		return e.RobotSessions, nil
+	}
+	return nil, &NotLoadedError{edge: "robot_sessions"}
+}
+
+// RobotMessagesOrErr returns the RobotMessages value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) RobotMessagesOrErr() ([]*RobotSessionMessage, error) {
+	if e.loadedTypes[41] {
+		return e.RobotMessages, nil
+	}
+	return nil, &NotLoadedError{edge: "robot_messages"}
+}
+
 // AccountRolesOrErr returns the AccountRoles value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) AccountRolesOrErr() ([]*AccountRoles, error) {
-	if e.loadedTypes[36] {
+	if e.loadedTypes[42] {
 		return e.AccountRoles, nil
 	}
 	return nil, &NotLoadedError{edge: "account_roles"}
@@ -664,11 +730,6 @@ func (_m *Account) QueryPosts() *PostQuery {
 	return NewAccountClient(_m.config).QueryPosts(_m)
 }
 
-// QueryQuestions queries the "questions" edge of the Account entity.
-func (_m *Account) QueryQuestions() *QuestionQuery {
-	return NewAccountClient(_m.config).QueryQuestions(_m)
-}
-
 // QueryReacts queries the "reacts" edge of the Account entity.
 func (_m *Account) QueryReacts() *ReactQuery {
 	return NewAccountClient(_m.config).QueryReacts(_m)
@@ -712,6 +773,11 @@ func (_m *Account) QueryOauthAuthorisationRequests() *OAuthAuthorisationRequestQ
 // QueryOauthRefreshTokens queries the "oauth_refresh_tokens" edge of the Account entity.
 func (_m *Account) QueryOauthRefreshTokens() *OAuthRefreshTokenQuery {
 	return NewAccountClient(_m.config).QueryOauthRefreshTokens(_m)
+}
+
+// QueryOauthRemoteConnections queries the "oauth_remote_connections" edge of the Account entity.
+func (_m *Account) QueryOauthRemoteConnections() *OAuthRemoteConnectionQuery {
+	return NewAccountClient(_m.config).QueryOauthRemoteConnections(_m)
 }
 
 // QueryClaimedOauthDeviceAuthorisations queries the "claimed_oauth_device_authorisations" edge of the Account entity.
@@ -792,6 +858,36 @@ func (_m *Account) QueryWarnings() *WarningQuery {
 // QueryAuthoredWarnings queries the "authored_warnings" edge of the Account entity.
 func (_m *Account) QueryAuthoredWarnings() *WarningQuery {
 	return NewAccountClient(_m.config).QueryAuthoredWarnings(_m)
+}
+
+// QueryRobots queries the "robots" edge of the Account entity.
+func (_m *Account) QueryRobots() *RobotQuery {
+	return NewAccountClient(_m.config).QueryRobots(_m)
+}
+
+// QueryRobotWorkspaces queries the "robot_workspaces" edge of the Account entity.
+func (_m *Account) QueryRobotWorkspaces() *RobotWorkspaceQuery {
+	return NewAccountClient(_m.config).QueryRobotWorkspaces(_m)
+}
+
+// QueryRobotWorkspaceInstances queries the "robot_workspace_instances" edge of the Account entity.
+func (_m *Account) QueryRobotWorkspaceInstances() *RobotWorkspaceInstanceQuery {
+	return NewAccountClient(_m.config).QueryRobotWorkspaceInstances(_m)
+}
+
+// QueryRobotMcpServers queries the "robot_mcp_servers" edge of the Account entity.
+func (_m *Account) QueryRobotMcpServers() *RobotMCPServerQuery {
+	return NewAccountClient(_m.config).QueryRobotMcpServers(_m)
+}
+
+// QueryRobotSessions queries the "robot_sessions" edge of the Account entity.
+func (_m *Account) QueryRobotSessions() *RobotSessionQuery {
+	return NewAccountClient(_m.config).QueryRobotSessions(_m)
+}
+
+// QueryRobotMessages queries the "robot_messages" edge of the Account entity.
+func (_m *Account) QueryRobotMessages() *RobotSessionMessageQuery {
+	return NewAccountClient(_m.config).QueryRobotMessages(_m)
 }
 
 // QueryAccountRoles queries the "account_roles" edge of the Account entity.

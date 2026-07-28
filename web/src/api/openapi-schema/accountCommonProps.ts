@@ -5,15 +5,17 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import type { AccountBio } from "./accountBio";
 import type { AccountEmailAddressList } from "./accountEmailAddressList";
 import type { AccountHandle } from "./accountHandle";
+import type { AccountKind } from "./accountKind";
 import type { AccountName } from "./accountName";
 import type { AccountRoleList } from "./accountRoleList";
 import type { AccountSignature } from "./accountSignature";
 import type { AccountVerifiedStatus } from "./accountVerifiedStatus";
+import type { AuthProviderIdentifierList } from "./authProviderIdentifierList";
 import type { MemberJoinedDate } from "./memberJoinedDate";
 import type { MemberSuspendedDate } from "./memberSuspendedDate";
 import type { Metadata } from "./metadata";
@@ -23,11 +25,13 @@ import type { ProfileReference } from "./profileReference";
 
 export interface AccountCommonProps {
   admin: boolean;
+  auth_services: AuthProviderIdentifierList;
   bio: AccountBio;
   email_addresses: AccountEmailAddressList;
   handle: AccountHandle;
   invited_by?: ProfileReference;
   joined: MemberJoinedDate;
+  kind: AccountKind;
   links: ProfileExternalLinkList;
   meta: Metadata;
   name: AccountName;

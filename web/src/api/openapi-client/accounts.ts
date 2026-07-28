@@ -5,7 +5,7 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import useSwr from "swr";
 import type { Arguments, Key, SWRConfiguration } from "swr";
@@ -21,6 +21,8 @@ import type {
   AccountEmailVerifiedStatusUpdateBody,
   AccountGetAvatarResponse,
   AccountGetOKResponse,
+  AccountListOKResponse,
+  AccountListParams,
   AccountManageCreateBody,
   AccountManageUpdateBody,
   AccountModerationNoteCreateBody,
@@ -45,6 +47,65 @@ import type {
   UnauthorisedResponse,
 } from "../openapi-schema";
 
+/**
+ * List accounts for administrative moderation purposes. This endpoint is
+intended for staff-facing member search and returns denser account data
+than the public profile listing such as email addresses, held auth
+services and administrative flags.
+
+Requires VIEW_ACCOUNTS. This is a read-only permission; account mutation
+endpoints require narrower management permissions like MANAGE_ACCOUNTS,
+MANAGE_SUSPENSIONS or ADMINISTRATOR.
+
+ */
+export const accountList = (params?: AccountListParams) => {
+  return fetcher<AccountListOKResponse>({
+    url: `/admin/accounts`,
+    method: "GET",
+    params,
+  });
+};
+
+export const getAccountListKey = (params?: AccountListParams) =>
+  [`/admin/accounts`, ...(params ? [params] : [])] as const;
+
+export type AccountListQueryResult = NonNullable<
+  Awaited<ReturnType<typeof accountList>>
+>;
+export type AccountListQueryError =
+  | UnauthorisedResponse
+  | InternalServerErrorResponse;
+
+export const useAccountList = <
+  TError = UnauthorisedResponse | InternalServerErrorResponse,
+>(
+  params?: AccountListParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof accountList>>, TError> & {
+      swrKey?: Key;
+      enabled?: boolean;
+    };
+  },
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const isEnabled = swrOptions?.enabled !== false;
+  const swrKey =
+    swrOptions?.swrKey ??
+    (() => (isEnabled ? getAccountListKey(params) : null));
+  const swrFn = () => accountList(params);
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(
+    swrKey,
+    swrFn,
+    swrOptions,
+  );
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
 /**
  * Create a human account without creating an authentication method. This
 is intended for admin and integration driven account provisioning.

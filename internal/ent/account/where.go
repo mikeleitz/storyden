@@ -946,29 +946,6 @@ func HasPostsWith(preds ...predicate.Post) predicate.Account {
 	})
 }
 
-// HasQuestions applies the HasEdge predicate on the "questions" edge.
-func HasQuestions() predicate.Account {
-	return predicate.Account(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, QuestionsTable, QuestionsColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasQuestionsWith applies the HasEdge predicate on the "questions" edge with a given conditions (other predicates).
-func HasQuestionsWith(preds ...predicate.Question) predicate.Account {
-	return predicate.Account(func(s *sql.Selector) {
-		step := newQuestionsStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
 // HasReacts applies the HasEdge predicate on the "reacts" edge.
 func HasReacts() predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {
@@ -1168,6 +1145,29 @@ func HasOauthRefreshTokens() predicate.Account {
 func HasOauthRefreshTokensWith(preds ...predicate.OAuthRefreshToken) predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {
 		step := newOauthRefreshTokensStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOauthRemoteConnections applies the HasEdge predicate on the "oauth_remote_connections" edge.
+func HasOauthRemoteConnections() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OauthRemoteConnectionsTable, OauthRemoteConnectionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOauthRemoteConnectionsWith applies the HasEdge predicate on the "oauth_remote_connections" edge with a given conditions (other predicates).
+func HasOauthRemoteConnectionsWith(preds ...predicate.OAuthRemoteConnection) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newOauthRemoteConnectionsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)
@@ -1536,6 +1536,144 @@ func HasAuthoredWarnings() predicate.Account {
 func HasAuthoredWarningsWith(preds ...predicate.Warning) predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {
 		step := newAuthoredWarningsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobots applies the HasEdge predicate on the "robots" edge.
+func HasRobots() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotsTable, RobotsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotsWith applies the HasEdge predicate on the "robots" edge with a given conditions (other predicates).
+func HasRobotsWith(preds ...predicate.Robot) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobotWorkspaces applies the HasEdge predicate on the "robot_workspaces" edge.
+func HasRobotWorkspaces() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotWorkspacesTable, RobotWorkspacesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotWorkspacesWith applies the HasEdge predicate on the "robot_workspaces" edge with a given conditions (other predicates).
+func HasRobotWorkspacesWith(preds ...predicate.RobotWorkspace) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotWorkspacesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobotWorkspaceInstances applies the HasEdge predicate on the "robot_workspace_instances" edge.
+func HasRobotWorkspaceInstances() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotWorkspaceInstancesTable, RobotWorkspaceInstancesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotWorkspaceInstancesWith applies the HasEdge predicate on the "robot_workspace_instances" edge with a given conditions (other predicates).
+func HasRobotWorkspaceInstancesWith(preds ...predicate.RobotWorkspaceInstance) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotWorkspaceInstancesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobotMcpServers applies the HasEdge predicate on the "robot_mcp_servers" edge.
+func HasRobotMcpServers() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotMcpServersTable, RobotMcpServersColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotMcpServersWith applies the HasEdge predicate on the "robot_mcp_servers" edge with a given conditions (other predicates).
+func HasRobotMcpServersWith(preds ...predicate.RobotMCPServer) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotMcpServersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobotSessions applies the HasEdge predicate on the "robot_sessions" edge.
+func HasRobotSessions() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotSessionsTable, RobotSessionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotSessionsWith applies the HasEdge predicate on the "robot_sessions" edge with a given conditions (other predicates).
+func HasRobotSessionsWith(preds ...predicate.RobotSession) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotSessionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRobotMessages applies the HasEdge predicate on the "robot_messages" edge.
+func HasRobotMessages() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RobotMessagesTable, RobotMessagesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRobotMessagesWith applies the HasEdge predicate on the "robot_messages" edge with a given conditions (other predicates).
+func HasRobotMessagesWith(preds ...predicate.RobotSessionMessage) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newRobotMessagesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

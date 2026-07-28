@@ -5,7 +5,7 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import useSwr from "swr";
 import type { Arguments, Key, SWRConfiguration } from "swr";
@@ -20,6 +20,7 @@ import type {
   NotFoundResponse,
   PluginAddBody,
   PluginCycleTokenOKResponse,
+  PluginDownloadPackageOKResponse,
   PluginGetConfigurationOKResponse,
   PluginGetConfigurationSchemaOKResponse,
   PluginGetLogsOKResponse,
@@ -515,6 +516,67 @@ export const usePluginUpdateManifest = <
   const swrFn = getPluginUpdateManifestMutationFetcher(pluginInstanceId);
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+/**
+ * Download the original package archive for a supervised plugin
+installation.
+
+The response body is the same zip archive bytes that were uploaded
+when the plugin was installed or last updated.
+
+ */
+export const pluginDownloadPackage = (pluginInstanceId: string) => {
+  return fetcher<PluginDownloadPackageOKResponse>({
+    url: `/plugins/${pluginInstanceId}/package`,
+    method: "GET",
+  });
+};
+
+export const getPluginDownloadPackageKey = (pluginInstanceId: string) =>
+  [`/plugins/${pluginInstanceId}/package`] as const;
+
+export type PluginDownloadPackageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof pluginDownloadPackage>>
+>;
+export type PluginDownloadPackageQueryError =
+  | BadRequestResponse
+  | UnauthorisedResponse
+  | NotFoundResponse
+  | InternalServerErrorResponse;
+
+export const usePluginDownloadPackage = <
+  TError =
+    | BadRequestResponse
+    | UnauthorisedResponse
+    | NotFoundResponse
+    | InternalServerErrorResponse,
+>(
+  pluginInstanceId: string,
+  options?: {
+    swr?: SWRConfiguration<
+      Awaited<ReturnType<typeof pluginDownloadPackage>>,
+      TError
+    > & { swrKey?: Key; enabled?: boolean };
+  },
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const isEnabled = swrOptions?.enabled !== false && !!pluginInstanceId;
+  const swrKey =
+    swrOptions?.swrKey ??
+    (() => (isEnabled ? getPluginDownloadPackageKey(pluginInstanceId) : null));
+  const swrFn = () => pluginDownloadPackage(pluginInstanceId);
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(
+    swrKey,
+    swrFn,
+    swrOptions,
+  );
 
   return {
     swrKey,

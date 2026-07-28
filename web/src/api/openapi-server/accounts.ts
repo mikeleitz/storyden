@@ -5,7 +5,7 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import type {
   AccountAuthProviderListOKResponse,
@@ -15,6 +15,8 @@ import type {
   AccountEmailVerifiedStatusUpdateBody,
   AccountGetAvatarResponse,
   AccountGetOKResponse,
+  AccountListOKResponse,
+  AccountListParams,
   AccountManageCreateBody,
   AccountManageUpdateBody,
   AccountModerationNoteCreateBody,
@@ -32,6 +34,55 @@ import type {
   NoContentResponse,
 } from "../openapi-schema";
 import { fetcher } from "../server";
+
+/**
+ * List accounts for administrative moderation purposes. This endpoint is
+intended for staff-facing member search and returns denser account data
+than the public profile listing such as email addresses, held auth
+services and administrative flags.
+
+Requires VIEW_ACCOUNTS. This is a read-only permission; account mutation
+endpoints require narrower management permissions like MANAGE_ACCOUNTS,
+MANAGE_SUSPENSIONS or ADMINISTRATOR.
+
+ */
+export type accountListResponse = {
+  data: AccountListOKResponse;
+  status: number;
+};
+
+export const getAccountListUrl = (params?: AccountListParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["roles", "invited_by", "auth_service"];
+
+    if (value instanceof Array && explodeParameters.includes(key)) {
+      value.forEach((v) =>
+        normalizedParams.append(key, v === null ? "null" : v.toString()),
+      );
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  return normalizedParams.size
+    ? `/admin/accounts?${normalizedParams.toString()}`
+    : `/admin/accounts`;
+};
+
+export const accountList = async (
+  params?: AccountListParams,
+  options?: RequestInit,
+): Promise<accountListResponse> => {
+  return fetcher<Promise<accountListResponse>>(getAccountListUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
 
 /**
  * Create a human account without creating an authentication method. This

@@ -472,6 +472,12 @@ type Config struct {
 	*/
 	PluginDataPath string `default:"./data/plugins" envconfig:"PLUGIN_DATA_PATH"`
 	/*
+	   The directory where local Robot workspace instance files will be stored. Each workspace instance gets its own subdirectory keyed by the workspace instance ID.
+
+	   This directory should be persistent and writable by the Storyden process when local Robot workspaces are used.
+	*/
+	RobotWorkspaceDataPath string `default:"./data/robot-workspaces" envconfig:"ROBOT_WORKSPACE_DATA_PATH"`
+	/*
 	   The plugin runtime provider. Different runtime providers offer different security guarantees. The simplest is `local` which just runs the plugin as a child process on the same machine as Storyden.
 
 	   - `none`: disables plugins entirely. Plugin APIs return a permission error and instance capabilities will not include `plugins`.
@@ -530,17 +536,6 @@ type Config struct {
 	LanguageModelProvider string `envconfig:"LANGUAGE_MODEL_PROVIDER"`
 	// When `LANGUAGE_MODEL_PROVIDER` is set to `openai`, this is the API key for the OpenAI API.
 	OpenAIKey string `envconfig:"OPENAI_API_KEY"`
-	/*
-	   The Asker feature provides a conversational interface for exploring the community's content across library pages, threads, links, profiles, etc. It is separate from the language model provider as some providers support different features.
-
-	   This can be set to either:
-
-	   - `openai` for OpenAI
-	   - `perplexity` for Perplexity AI - note that Perplexity does not currently support all the features necessary to be a `LANGUAGE_MODEL_PROVIDER` so it is only available as an `ASKER_PROVIDER`.
-	*/
-	AskerProvider string `default:"" envconfig:"ASKER_PROVIDER"`
-	// If `ASKER_PROVIDER` is set to `perplexity`, this is the API key for the Perplexity API.
-	PerplexityAPIKey string `envconfig:"PERPLEXITY_API_KEY"`
 
 	// -
 	// Semdex

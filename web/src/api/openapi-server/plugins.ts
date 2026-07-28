@@ -5,12 +5,13 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import type {
   NoContentResponse,
   PluginAddBody,
   PluginCycleTokenOKResponse,
+  PluginDownloadPackageOKResponse,
   PluginGetConfigurationOKResponse,
   PluginGetConfigurationSchemaOKResponse,
   PluginGetLogsOKResponse,
@@ -254,6 +255,36 @@ export const pluginUpdateManifest = async (
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...options?.headers },
       body: JSON.stringify(pluginUpdateManifestBody),
+    },
+  );
+};
+
+/**
+ * Download the original package archive for a supervised plugin
+installation.
+
+The response body is the same zip archive bytes that were uploaded
+when the plugin was installed or last updated.
+
+ */
+export type pluginDownloadPackageResponse = {
+  data: PluginDownloadPackageOKResponse;
+  status: number;
+};
+
+export const getPluginDownloadPackageUrl = (pluginInstanceId: string) => {
+  return `/plugins/${pluginInstanceId}/package`;
+};
+
+export const pluginDownloadPackage = async (
+  pluginInstanceId: string,
+  options?: RequestInit,
+): Promise<pluginDownloadPackageResponse> => {
+  return fetcher<Promise<pluginDownloadPackageResponse>>(
+    getPluginDownloadPackageUrl(pluginInstanceId),
+    {
+      ...options,
+      method: "GET",
     },
   );
 };

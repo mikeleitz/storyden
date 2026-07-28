@@ -24,6 +24,7 @@ var (
 	OperationIDSendBeacon                             = OperationID{`SendBeacon`}
 	OperationIDAdminSettingsGet                       = OperationID{`AdminSettingsGet`}
 	OperationIDAdminSettingsUpdate                    = OperationID{`AdminSettingsUpdate`}
+	OperationIDAccountList                            = OperationID{`AccountList`}
 	OperationIDAuditEventList                         = OperationID{`AuditEventList`}
 	OperationIDEmailQueueList                         = OperationID{`EmailQueueList`}
 	OperationIDEmailQueueRetry                        = OperationID{`EmailQueueRetry`}
@@ -41,6 +42,10 @@ var (
 	OperationIDAdminOAuthDeviceAuthorisationList      = OperationID{`AdminOAuthDeviceAuthorisationList`}
 	OperationIDAdminOAuthRefreshTokenList             = OperationID{`AdminOAuthRefreshTokenList`}
 	OperationIDAdminOAuthRefreshTokenDelete           = OperationID{`AdminOAuthRefreshTokenDelete`}
+	OperationIDOAuthRemoteDiscover                    = OperationID{`OAuthRemoteDiscover`}
+	OperationIDOAuthRemoteConnectionList              = OperationID{`OAuthRemoteConnectionList`}
+	OperationIDOAuthRemoteConnectionCreate            = OperationID{`OAuthRemoteConnectionCreate`}
+	OperationIDOAuthRemoteConnectionAuthorize         = OperationID{`OAuthRemoteConnectionAuthorize`}
 	OperationIDPluginList                             = OperationID{`PluginList`}
 	OperationIDPluginAdd                              = OperationID{`PluginAdd`}
 	OperationIDPluginGet                              = OperationID{`PluginGet`}
@@ -49,6 +54,7 @@ var (
 	OperationIDPluginGetLogs                          = OperationID{`PluginGetLogs`}
 	OperationIDPluginCycleToken                       = OperationID{`PluginCycleToken`}
 	OperationIDPluginUpdateManifest                   = OperationID{`PluginUpdateManifest`}
+	OperationIDPluginDownloadPackage                  = OperationID{`PluginDownloadPackage`}
 	OperationIDPluginUpdatePackage                    = OperationID{`PluginUpdatePackage`}
 	OperationIDPluginGetConfigurationSchema           = OperationID{`PluginGetConfigurationSchema`}
 	OperationIDPluginGetConfiguration                 = OperationID{`PluginGetConfiguration`}
@@ -81,6 +87,7 @@ var (
 	OperationIDOAuthAuthoriseConsentSubmit            = OperationID{`OAuthAuthoriseConsentSubmit`}
 	OperationIDOAuthToken                             = OperationID{`OAuthToken`}
 	OperationIDOAuthUserInfo                          = OperationID{`OAuthUserInfo`}
+	OperationIDOAuthRemoteCallback                    = OperationID{`OAuthRemoteCallback`}
 	OperationIDOAuthClientRegister                    = OperationID{`OAuthClientRegister`}
 	OperationIDWebAuthnRequestCredential              = OperationID{`WebAuthnRequestCredential`}
 	OperationIDWebAuthnMakeCredential                 = OperationID{`WebAuthnMakeCredential`}
@@ -206,7 +213,6 @@ var (
 	OperationIDLinkGet                                = OperationID{`LinkGet`}
 	OperationIDDatagraphSearch                        = OperationID{`DatagraphSearch`}
 	OperationIDDatagraphMatches                       = OperationID{`DatagraphMatches`}
-	OperationIDDatagraphAsk                           = OperationID{`DatagraphAsk`}
 	OperationIDEventList                              = OperationID{`EventList`}
 	OperationIDEventCreate                            = OperationID{`EventCreate`}
 	OperationIDEventGet                               = OperationID{`EventGet`}
@@ -214,6 +220,35 @@ var (
 	OperationIDEventDelete                            = OperationID{`EventDelete`}
 	OperationIDEventParticipantUpdate                 = OperationID{`EventParticipantUpdate`}
 	OperationIDEventParticipantRemove                 = OperationID{`EventParticipantRemove`}
+	OperationIDRobotsList                             = OperationID{`RobotsList`}
+	OperationIDRobotCreate                            = OperationID{`RobotCreate`}
+	OperationIDRobotToolsList                         = OperationID{`RobotToolsList`}
+	OperationIDRobotChatSSE                           = OperationID{`RobotChatSSE`}
+	OperationIDRobotProvidersList                     = OperationID{`RobotProvidersList`}
+	OperationIDRobotProviderUpdate                    = OperationID{`RobotProviderUpdate`}
+	OperationIDRobotProviderModelsRefresh             = OperationID{`RobotProviderModelsRefresh`}
+	OperationIDRobotModelsList                        = OperationID{`RobotModelsList`}
+	OperationIDRobotWorkspaceProvidersList            = OperationID{`RobotWorkspaceProvidersList`}
+	OperationIDRobotWorkspacesList                    = OperationID{`RobotWorkspacesList`}
+	OperationIDRobotWorkspaceCreate                   = OperationID{`RobotWorkspaceCreate`}
+	OperationIDRobotWorkspaceGet                      = OperationID{`RobotWorkspaceGet`}
+	OperationIDRobotWorkspaceUpdate                   = OperationID{`RobotWorkspaceUpdate`}
+	OperationIDRobotWorkspaceDelete                   = OperationID{`RobotWorkspaceDelete`}
+	OperationIDRobotWorkspaceInstancesList            = OperationID{`RobotWorkspaceInstancesList`}
+	OperationIDRobotWorkspaceInstanceGet              = OperationID{`RobotWorkspaceInstanceGet`}
+	OperationIDRobotWorkspaceInstanceDelete           = OperationID{`RobotWorkspaceInstanceDelete`}
+	OperationIDRobotGet                               = OperationID{`RobotGet`}
+	OperationIDRobotUpdate                            = OperationID{`RobotUpdate`}
+	OperationIDRobotDelete                            = OperationID{`RobotDelete`}
+	OperationIDRobotSessionsList                      = OperationID{`RobotSessionsList`}
+	OperationIDRobotSessionGet                        = OperationID{`RobotSessionGet`}
+	OperationIDRobotMCPServersList                    = OperationID{`RobotMCPServersList`}
+	OperationIDRobotMCPServerCreate                   = OperationID{`RobotMCPServerCreate`}
+	OperationIDRobotMCPServerProbe                    = OperationID{`RobotMCPServerProbe`}
+	OperationIDRobotMCPServerGet                      = OperationID{`RobotMCPServerGet`}
+	OperationIDRobotMCPServerUpdate                   = OperationID{`RobotMCPServerUpdate`}
+	OperationIDRobotMCPServerDelete                   = OperationID{`RobotMCPServerDelete`}
+	OperationIDRobotMCPServerRefresh                  = OperationID{`RobotMCPServerRefresh`}
 )
 
 func (r OperationID) Format(f fmt.State, verb rune) {
@@ -277,6 +312,8 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDAdminSettingsGet, nil
 	case string(`AdminSettingsUpdate`):
 		return OperationIDAdminSettingsUpdate, nil
+	case string(`AccountList`):
+		return OperationIDAccountList, nil
 	case string(`AuditEventList`):
 		return OperationIDAuditEventList, nil
 	case string(`EmailQueueList`):
@@ -311,6 +348,14 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDAdminOAuthRefreshTokenList, nil
 	case string(`AdminOAuthRefreshTokenDelete`):
 		return OperationIDAdminOAuthRefreshTokenDelete, nil
+	case string(`OAuthRemoteDiscover`):
+		return OperationIDOAuthRemoteDiscover, nil
+	case string(`OAuthRemoteConnectionList`):
+		return OperationIDOAuthRemoteConnectionList, nil
+	case string(`OAuthRemoteConnectionCreate`):
+		return OperationIDOAuthRemoteConnectionCreate, nil
+	case string(`OAuthRemoteConnectionAuthorize`):
+		return OperationIDOAuthRemoteConnectionAuthorize, nil
 	case string(`PluginList`):
 		return OperationIDPluginList, nil
 	case string(`PluginAdd`):
@@ -327,6 +372,8 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDPluginCycleToken, nil
 	case string(`PluginUpdateManifest`):
 		return OperationIDPluginUpdateManifest, nil
+	case string(`PluginDownloadPackage`):
+		return OperationIDPluginDownloadPackage, nil
 	case string(`PluginUpdatePackage`):
 		return OperationIDPluginUpdatePackage, nil
 	case string(`PluginGetConfigurationSchema`):
@@ -391,6 +438,8 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDOAuthToken, nil
 	case string(`OAuthUserInfo`):
 		return OperationIDOAuthUserInfo, nil
+	case string(`OAuthRemoteCallback`):
+		return OperationIDOAuthRemoteCallback, nil
 	case string(`OAuthClientRegister`):
 		return OperationIDOAuthClientRegister, nil
 	case string(`WebAuthnRequestCredential`):
@@ -641,8 +690,6 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDDatagraphSearch, nil
 	case string(`DatagraphMatches`):
 		return OperationIDDatagraphMatches, nil
-	case string(`DatagraphAsk`):
-		return OperationIDDatagraphAsk, nil
 	case string(`EventList`):
 		return OperationIDEventList, nil
 	case string(`EventCreate`):
@@ -657,6 +704,64 @@ func NewOperationID(__iNpUt__ string) (OperationID, error) {
 		return OperationIDEventParticipantUpdate, nil
 	case string(`EventParticipantRemove`):
 		return OperationIDEventParticipantRemove, nil
+	case string(`RobotsList`):
+		return OperationIDRobotsList, nil
+	case string(`RobotCreate`):
+		return OperationIDRobotCreate, nil
+	case string(`RobotToolsList`):
+		return OperationIDRobotToolsList, nil
+	case string(`RobotChatSSE`):
+		return OperationIDRobotChatSSE, nil
+	case string(`RobotProvidersList`):
+		return OperationIDRobotProvidersList, nil
+	case string(`RobotProviderUpdate`):
+		return OperationIDRobotProviderUpdate, nil
+	case string(`RobotProviderModelsRefresh`):
+		return OperationIDRobotProviderModelsRefresh, nil
+	case string(`RobotModelsList`):
+		return OperationIDRobotModelsList, nil
+	case string(`RobotWorkspaceProvidersList`):
+		return OperationIDRobotWorkspaceProvidersList, nil
+	case string(`RobotWorkspacesList`):
+		return OperationIDRobotWorkspacesList, nil
+	case string(`RobotWorkspaceCreate`):
+		return OperationIDRobotWorkspaceCreate, nil
+	case string(`RobotWorkspaceGet`):
+		return OperationIDRobotWorkspaceGet, nil
+	case string(`RobotWorkspaceUpdate`):
+		return OperationIDRobotWorkspaceUpdate, nil
+	case string(`RobotWorkspaceDelete`):
+		return OperationIDRobotWorkspaceDelete, nil
+	case string(`RobotWorkspaceInstancesList`):
+		return OperationIDRobotWorkspaceInstancesList, nil
+	case string(`RobotWorkspaceInstanceGet`):
+		return OperationIDRobotWorkspaceInstanceGet, nil
+	case string(`RobotWorkspaceInstanceDelete`):
+		return OperationIDRobotWorkspaceInstanceDelete, nil
+	case string(`RobotGet`):
+		return OperationIDRobotGet, nil
+	case string(`RobotUpdate`):
+		return OperationIDRobotUpdate, nil
+	case string(`RobotDelete`):
+		return OperationIDRobotDelete, nil
+	case string(`RobotSessionsList`):
+		return OperationIDRobotSessionsList, nil
+	case string(`RobotSessionGet`):
+		return OperationIDRobotSessionGet, nil
+	case string(`RobotMCPServersList`):
+		return OperationIDRobotMCPServersList, nil
+	case string(`RobotMCPServerCreate`):
+		return OperationIDRobotMCPServerCreate, nil
+	case string(`RobotMCPServerProbe`):
+		return OperationIDRobotMCPServerProbe, nil
+	case string(`RobotMCPServerGet`):
+		return OperationIDRobotMCPServerGet, nil
+	case string(`RobotMCPServerUpdate`):
+		return OperationIDRobotMCPServerUpdate, nil
+	case string(`RobotMCPServerDelete`):
+		return OperationIDRobotMCPServerDelete, nil
+	case string(`RobotMCPServerRefresh`):
+		return OperationIDRobotMCPServerRefresh, nil
 	default:
 		return OperationID{}, fmt.Errorf("invalid value for type 'OperationID': '%s'", __iNpUt__)
 	}

@@ -1,3 +1,75 @@
+export interface CapabilityConfigBase {
+  description?: string;
+  // Stable capability identifier. For Robot LLM providers, this is the provider identifier used in `provider/model` refs. For Robot tool providers, this is the provider namespace used to build fully qualified Robot tool names.
+  id: string;
+  // Human-readable capability name.
+  name?: string;
+  // Capability type discriminator.
+  type: string;
+  // Version of the host capability protocol implemented by this plugin.
+  version: string;
+}
+
+export interface RobotToolAnnotations {
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  readOnlyHint?: boolean;
+}
+
+export type RobotToolJSONSchema = unknown;
+
+export interface RobotToolProviderToolConfig {
+  annotations?: RobotToolAnnotations;
+  description: string;
+  // Stable provider-local tool identifier.
+  id: string;
+  input_schema: RobotToolJSONSchema;
+  // Human-readable tool name.
+  name: string;
+  output_schema?: RobotToolJSONSchema;
+  requires_confirmation?: boolean;
+  // Optional display title for MCP clients and Robot builders.
+  title?: string;
+}
+
+
+export interface RobotLLMProviderCapabilityConfig {
+  type: "robot.llm_provider";
+  description?: string;
+  // Stable capability identifier. For Robot LLM providers, this is the provider identifier used in `provider/model` refs. For Robot tool providers, this is the provider namespace used to build fully qualified Robot tool names.
+  id: string;
+  // Human-readable capability name.
+  name?: string;
+  // Version of the host capability protocol implemented by this plugin.
+  version: string;
+}
+
+export interface RobotToolProviderCapabilityConfig {
+  type: "robot.tool_provider";
+  description?: string;
+  // Stable capability identifier. For Robot LLM providers, this is the provider identifier used in `provider/model` refs. For Robot tool providers, this is the provider namespace used to build fully qualified Robot tool names.
+  id: string;
+  // Human-readable capability name.
+  name?: string;
+  // Robot tools statically provided by this plugin.
+  tools: RobotToolProviderToolConfig[];
+  // Version of the host capability protocol implemented by this plugin.
+  version: string;
+}
+
+export type CapabilityConfig =
+  | RobotLLMProviderCapabilityConfig
+  | RobotToolProviderCapabilityConfig;
+
+export function isRobotLLMProviderCapabilityConfig(value: CapabilityConfig): value is RobotLLMProviderCapabilityConfig {
+  return value.type === "robot.llm_provider";
+}
+
+export function isRobotToolProviderCapabilityConfig(value: CapabilityConfig): value is RobotToolProviderCapabilityConfig {
+  return value.type === "robot.tool_provider";
+}
+
 export interface DatagraphRef {
   // Resource ID
   id: string;
@@ -666,6 +738,50 @@ export interface JsonRpcRequest {
 export interface RPCRequestPingParams {
 }
 
+export interface RobotModelProviderMessage {
+  content?: string;
+  name?: string;
+  role: string;
+  tool_call_id?: string;
+}
+
+export interface RobotModelProviderTool {
+  description?: string;
+  name: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface RPCRequestRobotModelProviderGenerateParams {
+  messages: RobotModelProviderMessage[];
+  // Model name within the provider namespace.
+  model: string;
+  // Provider identifier declared by the plugin manifest.
+  provider: string;
+  system?: string;
+  tools?: RobotModelProviderTool[];
+}
+
+export interface RPCRequestRobotModelProviderListModelsParams {
+  // Provider identifier declared by the plugin manifest.
+  provider: string;
+}
+
+export interface RPCRequestRobotToolCallParams {
+  // Account identifier for the user who invoked the Robot run.
+  account_id: string;
+  arguments: Record<string, unknown>;
+  // Host-generated tool call identifier.
+  call_id: string;
+  // Tool provider identifier declared by the plugin manifest.
+  provider_id: string;
+  // Active Robot identifier when the call came from a custom Robot.
+  robot_id?: string;
+  // Robot session identifier.
+  session_id: string;
+  // Provider-local tool identifier declared by the plugin manifest.
+  tool_id: string;
+}
+
 
 // Request sent by the host to the plugin to provide configuration settings. The params object can contain any key-value pairs defined by the plugin in its manifest `configuration_schema` field and the plugin should validate and apply these settings to its internal state.
 // If configuration changes require a plugin to restart, the plugin should cleanly shut down with a zero exit code so that the host can restart it if it is a supervised plugin. If it is an external plugin, the plugin itself is responsible for this behavior based on the plugin's lifecycle design.
@@ -692,10 +808,37 @@ export interface RPCRequestPing {
   params?: RPCRequestPingParams;
 }
 
+// Requests the current list of models exposed by a plugin-backed Robot model provider.
+export interface RPCRequestRobotModelProviderListModels {
+  method: "robot_model_provider_list_models";
+  id: string;
+  jsonrpc: string;
+  params: RPCRequestRobotModelProviderListModelsParams;
+}
+
+// Runs one non-streaming model generation through a plugin-backed Robot model provider.
+export interface RPCRequestRobotModelProviderGenerate {
+  method: "robot_model_provider_generate";
+  id: string;
+  jsonrpc: string;
+  params: RPCRequestRobotModelProviderGenerateParams;
+}
+
+// Executes a manifest-declared Robot tool provided by a plugin.
+export interface RPCRequestRobotToolCall {
+  method: "robot_tool_call";
+  id: string;
+  jsonrpc: string;
+  params: RPCRequestRobotToolCallParams;
+}
+
 export type HostToPluginRequest =
   | RPCRequestConfigure
   | RPCRequestEvent
-  | RPCRequestPing;
+  | RPCRequestPing
+  | RPCRequestRobotModelProviderListModels
+  | RPCRequestRobotModelProviderGenerate
+  | RPCRequestRobotToolCall;
 
 export function isRPCRequestConfigure(value: HostToPluginRequest): value is RPCRequestConfigure {
   return value.method === "configure";
@@ -709,9 +852,42 @@ export function isRPCRequestPing(value: HostToPluginRequest): value is RPCReques
   return value.method === "ping";
 }
 
+export function isRPCRequestRobotModelProviderListModels(value: HostToPluginRequest): value is RPCRequestRobotModelProviderListModels {
+  return value.method === "robot_model_provider_list_models";
+}
+
+export function isRPCRequestRobotModelProviderGenerate(value: HostToPluginRequest): value is RPCRequestRobotModelProviderGenerate {
+  return value.method === "robot_model_provider_generate";
+}
+
+export function isRPCRequestRobotToolCall(value: HostToPluginRequest): value is RPCRequestRobotToolCall {
+  return value.method === "robot_tool_call";
+}
+
 export interface HostToPluginResponseError {
   code?: number;
   message?: string;
+}
+
+export interface RobotModelProviderModel {
+  // Context window in tokens, when known.
+  context_window?: number;
+  // Human-readable model name.
+  display_name?: string;
+  // Maximum output tokens, when known.
+  max_output_tokens?: number;
+  // Model name within the provider namespace.
+  name: string;
+  // Provider-specific model metadata.
+  raw?: Record<string, unknown>;
+  // Model release time, when known.
+  released_at?: Date;
+}
+
+export interface RobotModelProviderToolCall {
+  arguments?: Record<string, unknown>;
+  id?: string;
+  name: string;
 }
 
 
@@ -737,10 +913,35 @@ export interface RPCResponsePing {
   uptime_seconds?: number;
 }
 
+// Returns models exposed by a plugin-backed Robot model provider.
+export interface RPCResponseRobotModelProviderListModels {
+  method: "robot_model_provider_list_models";
+  models: RobotModelProviderModel[];
+}
+
+// Returns one non-streaming model generation from a plugin-backed Robot model provider.
+export interface RPCResponseRobotModelProviderGenerate {
+  method: "robot_model_provider_generate";
+  content?: string;
+  error?: string;
+  finish_reason?: string;
+  tool_calls?: RobotModelProviderToolCall[];
+}
+
+// Returns a structured result from a plugin-provided Robot tool.
+export interface RPCResponseRobotToolCall {
+  method: "robot_tool_call";
+  error?: string;
+  output?: Record<string, unknown>;
+}
+
 export type HostToPluginResponseUnion =
   | RPCResponseConfigure
   | RPCResponseEvent
-  | RPCResponsePing;
+  | RPCResponsePing
+  | RPCResponseRobotModelProviderListModels
+  | RPCResponseRobotModelProviderGenerate
+  | RPCResponseRobotToolCall;
 
 export function isRPCResponseConfigure(value: HostToPluginResponseUnion): value is RPCResponseConfigure {
   return value.method === "configure";
@@ -752,6 +953,18 @@ export function isRPCResponseEvent(value: HostToPluginResponseUnion): value is R
 
 export function isRPCResponsePing(value: HostToPluginResponseUnion): value is RPCResponsePing {
   return value.method === "ping";
+}
+
+export function isRPCResponseRobotModelProviderListModels(value: HostToPluginResponseUnion): value is RPCResponseRobotModelProviderListModels {
+  return value.method === "robot_model_provider_list_models";
+}
+
+export function isRPCResponseRobotModelProviderGenerate(value: HostToPluginResponseUnion): value is RPCResponseRobotModelProviderGenerate {
+  return value.method === "robot_model_provider_generate";
+}
+
+export function isRPCResponseRobotToolCall(value: HostToPluginResponseUnion): value is RPCResponseRobotToolCall {
+  return value.method === "robot_tool_call";
 }
 
 export interface JsonRpcResponseError {
@@ -861,6 +1074,8 @@ export interface Manifest {
   // The author of the plugin. Must match the pattern `^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$`.
   // (NOTE: May change in future.)
   author: string;
+  // Platform capabilities this plugin provides. Capabilities extend Storyden with host-defined integration points such as Robot model providers, authentication providers, or Robot tools.
+  capabilities?: CapabilityConfig[];
   // The executable or script used to launch your plugin. If your plugin is a binary (Go, Rust, C, etc) then this should be a path to that binary, it's best to put it in the root of your plugin archive like `./myplugin.exe` or `./myplugin`. If your plugin is a script (Python, Node, etc) then this should be the interpreter's `$PATH` executable (e.g. `python` or `node`)  and you should include the script in the `args` field.
   // This field is used only for Supervised plugins. External plugins can provide a placeholder value and it will be ignored by the runtime.
   // Note that Storyden cannot guarantee that the runtime environment defined by the person hosting Storyden will have any language's interpreter on the `$PATH`. If you are running your own instance and building a custom plugin, you should `FROM` the Storyden base image for your deployment so that you know what runtimes are available.
@@ -885,6 +1100,25 @@ export interface RPCRequestGetConfigParams {
   keys?: string[];
 }
 
+// Optional workspace mount request. Provide either workspace_id or workspace_instance_id, not both.
+export interface RPCRequestRobotRunParamsWorkspace {
+  // Workspace template to instantiate and mount for this run.
+  workspace_id?: string;
+  // Existing workspace instance to mount for this run.
+  workspace_instance_id?: string;
+}
+
+export interface RPCRequestRobotRunParams {
+  // Input message for the robot.
+  message: string;
+  // The Robot to invoke.
+  robot_id: string;
+  // Optional existing Robot session ID to continue. If omitted, a new session is created.
+  session_id?: string;
+  // Optional workspace mount request. Provide either workspace_id or workspace_instance_id, not both.
+  workspace?: RPCRequestRobotRunParamsWorkspace;
+}
+
 
 // Request API access credentials provisioned for this plugin.
 export interface RPCRequestAccessGet {
@@ -901,9 +1135,18 @@ export interface RPCRequestGetConfig {
   params?: RPCRequestGetConfigParams;
 }
 
+// Run a one-shot robot invocation and return the assistant's final text response.
+export interface RPCRequestRobotRun {
+  method: "robot_run";
+  id: string;
+  jsonrpc: string;
+  params: RPCRequestRobotRunParams;
+}
+
 export type PluginToHostRequest =
   | RPCRequestAccessGet
-  | RPCRequestGetConfig;
+  | RPCRequestGetConfig
+  | RPCRequestRobotRun;
 
 export function isRPCRequestAccessGet(value: PluginToHostRequest): value is RPCRequestAccessGet {
   return value.method === "access_get";
@@ -911,6 +1154,10 @@ export function isRPCRequestAccessGet(value: PluginToHostRequest): value is RPCR
 
 export function isRPCRequestGetConfig(value: PluginToHostRequest): value is RPCRequestGetConfig {
   return value.method === "get_config";
+}
+
+export function isRPCRequestRobotRun(value: PluginToHostRequest): value is RPCRequestRobotRun {
+  return value.method === "robot_run";
 }
 
 export interface PluginToHostResponseError {
@@ -931,6 +1178,35 @@ export interface RPCResponseAccessGetResult {
 }
 
 
+// Reason an unattended Robot invocation needs human attention.
+export type RobotRunAttentionReason =
+  | "missing_input"
+  | "needs_approval"
+  | "policy_blocked"
+  | "tool_unavailable"
+  | "error";
+
+export interface RobotRunAttention {
+  // Actionable explanation for the user.
+  message: string;
+  reason: RobotRunAttentionReason;
+}
+
+
+// Overall status of an unattended Robot invocation.
+export type RobotRunStatus =
+  | "completed"
+  | "blocked"
+  | "failed";
+
+export interface RobotRunOutput {
+  attention?: RobotRunAttention;
+  status: RobotRunStatus;
+  // Concise user-facing summary of what happened.
+  summary: string;
+}
+
+
 // Returns API base URL and bearer access key for authenticated API calls.
 export interface RPCResponseAccessGet {
   method: "access_get";
@@ -947,9 +1223,20 @@ export interface RPCResponseGetConfig {
   config: Record<string, unknown>;
 }
 
+// Final result of a one-shot robot invocation.
+export interface RPCResponseRobotRun {
+  method: "robot_run";
+  // Error message if invocation failed.
+  error?: string;
+  output?: RobotRunOutput;
+  // Robot session ID containing the persisted invocation log.
+  session_id?: string;
+}
+
 export type PluginToHostResponseUnion =
   | RPCResponseAccessGet
-  | RPCResponseGetConfig;
+  | RPCResponseGetConfig
+  | RPCResponseRobotRun;
 
 export function isRPCResponseAccessGet(value: PluginToHostResponseUnion): value is RPCResponseAccessGet {
   return value.method === "access_get";
@@ -957,6 +1244,10 @@ export function isRPCResponseAccessGet(value: PluginToHostResponseUnion): value 
 
 export function isRPCResponseGetConfig(value: PluginToHostResponseUnion): value is RPCResponseGetConfig {
   return value.method === "get_config";
+}
+
+export function isRPCResponseRobotRun(value: PluginToHostResponseUnion): value is RPCResponseRobotRun {
+  return value.method === "robot_run";
 }
 
 export interface PluginToHostResponse {

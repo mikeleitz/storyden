@@ -1,9 +1,11 @@
 package bindings
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -175,6 +177,27 @@ func (p *Plugins) PluginGetLogs(ctx context.Context, request openapi.PluginGetLo
 	}, nil
 }
 
+func (p *Plugins) PluginDownloadPackage(ctx context.Context, request openapi.PluginDownloadPackageRequestObject) (openapi.PluginDownloadPackageResponseObject, error) {
+	id := plugin.InstallationID(deserialiseID(request.PluginInstanceId))
+
+	data, manifestID, err := p.pm.DownloadPackage(ctx, id)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	return openapi.PluginDownloadPackage200ApplicationzipResponse{
+		PluginDownloadPackageOKApplicationzipResponse: openapi.PluginDownloadPackageOKApplicationzipResponse{
+			Body: bytes.NewReader(data),
+			Headers: openapi.PluginDownloadPackageOKResponseHeaders{
+				ContentDisposition: mime.FormatMediaType("attachment", map[string]string{
+					"filename": pluginPackageFilename(manifestID),
+				}),
+			},
+			ContentLength: int64(len(data)),
+		},
+	}, nil
+}
+
 func (p *Plugins) PluginUpdateManifest(ctx context.Context, request openapi.PluginUpdateManifestRequestObject) (openapi.PluginUpdateManifestResponseObject, error) {
 	id := plugin.InstallationID(deserialiseID(request.PluginInstanceId))
 
@@ -279,6 +302,14 @@ func (response pluginUpdateConfiguration200JSONResponse) VisitPluginUpdateConfig
 	return json.NewEncoder(w).Encode(map[string]any(response))
 }
 
+func pluginPackageFilename(manifestID string) string {
+	manifestID = strings.TrimSpace(manifestID)
+	if manifestID == "" {
+		return "plugin.zip"
+	}
+	return manifestID + ".zip"
+}
+
 func serialisePlugin(in *plugin.Record) openapi.Plugin {
 	out := openapi.Plugin{
 		Id:          openapi.Identifier(xid.ID(in.InstallationID).String()),
@@ -314,7 +345,7 @@ func serialisePluginStatus(in *plugin.Record) openapi.PluginStatus {
 	switch in.ReportedState {
 	case plugin.ReportedStateActive:
 		as.FromPluginStatusActive(openapi.PluginStatusActive{
-			ActiveState: openapi.PluginStatusActiveActiveStateActive,
+			ActiveState: openapi.Active,
 			ActivatedAt: in.StartedAt,
 		})
 

@@ -5,11 +5,9 @@
  * Storyden social API for building community driven platforms.
 The Storyden API does not adhere to semantic versioning but instead applies a rolling strategy with deprecations and minimal breaking changes. This has been done mainly for a simpler development process and it may be changed to a more fixed versioning strategy in the future. Ultimately, the primary way Storyden tracks versions is dates, there are no set release tags currently.
 
- * OpenAPI spec version: v1.26.11-post
+ * OpenAPI spec version: v1.26.13-post
  */
 import type {
-  DatagraphAskOKResponse,
-  DatagraphAskParams,
   DatagraphMatchesOKResponse,
   DatagraphMatchesParams,
   DatagraphSearchOKResponse,
@@ -115,36 +113,4 @@ export const datagraphMatches = async (
       method: "GET",
     },
   );
-};
-
-/**
- * Ask questions about the community's content.
- */
-export type datagraphAskResponse = {
-  data: DatagraphAskOKResponse;
-  status: number;
-};
-
-export const getDatagraphAskUrl = (params: DatagraphAskParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : value.toString());
-    }
-  });
-
-  return normalizedParams.size
-    ? `/datagraph/ask?${normalizedParams.toString()}`
-    : `/datagraph/ask`;
-};
-
-export const datagraphAsk = async (
-  params: DatagraphAskParams,
-  options?: RequestInit,
-): Promise<datagraphAskResponse> => {
-  return fetcher<Promise<datagraphAskResponse>>(getDatagraphAskUrl(params), {
-    ...options,
-    method: "GET",
-  });
 };

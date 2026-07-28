@@ -1,14 +1,12 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "target": "ES6",
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "alwaysStrict": true,
     "exactOptionalPropertyTypes": false,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -17,12 +15,9 @@
     "noUnusedParameters": false,
     "noImplicitAny": false,
     "strict": true,
-    "strictBindCallApply": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "useUnknownInCatchVariables": true,
     "forceConsistentCasingInFileNames": true,
-    "downlevelIteration": true,
     "noEmit": true,
     "incremental": true,
     "module": "esnext",
@@ -36,8 +31,9 @@
       }
     ],
     "paths": {
-      "@/*": ["src/*"],
-      "@/styled-system/*": ["styled-system/*"]
+      "@/*": ["./src/*"],
+      "@/styled-system/*": ["./styled-system/*"],
+      "styled-system/*": ["./styled-system/*"]
     }
   },
   "include": [
