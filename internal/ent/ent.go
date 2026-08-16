@@ -55,6 +55,9 @@ import (
 	"github.com/Southclaws/storyden/internal/ent/robotprovidermodel"
 	"github.com/Southclaws/storyden/internal/ent/robotsession"
 	"github.com/Southclaws/storyden/internal/ent/robotsessionmessage"
+	"github.com/Southclaws/storyden/internal/ent/robotsessionturn"
+	"github.com/Southclaws/storyden/internal/ent/robotsessionview"
+	"github.com/Southclaws/storyden/internal/ent/robottoolset"
 	"github.com/Southclaws/storyden/internal/ent/robotworkspace"
 	"github.com/Southclaws/storyden/internal/ent/robotworkspaceinstance"
 	"github.com/Southclaws/storyden/internal/ent/role"
@@ -165,6 +168,9 @@ func checkColumn(t, c string) error {
 			robotprovidermodel.Table:           robotprovidermodel.ValidColumn,
 			robotsession.Table:                 robotsession.ValidColumn,
 			robotsessionmessage.Table:          robotsessionmessage.ValidColumn,
+			robotsessionturn.Table:             robotsessionturn.ValidColumn,
+			robotsessionview.Table:             robotsessionview.ValidColumn,
+			robottoolset.Table:                 robottoolset.ValidColumn,
 			robotworkspace.Table:               robotworkspace.ValidColumn,
 			robotworkspaceinstance.Table:       robotworkspaceinstance.ValidColumn,
 			role.Table:                         role.ValidColumn,

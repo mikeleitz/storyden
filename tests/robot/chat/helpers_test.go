@@ -1,7 +1,6 @@
 package chat_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Southclaws/storyden/app/services/semdex/robot/agent_registry"
 	"github.com/Southclaws/storyden/app/transports/http/openapi"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/require"
+
+	robottest "github.com/Southclaws/storyden/tests/robot"
 )
 
 const (
@@ -24,6 +24,7 @@ const (
 	mockModelToolError       = "mock/../scripts/robot-chat-tool-error.yaml"
 	mockModelLLMError        = "mock/../scripts/robot-chat-llm-error.yaml"
 	mockModelAck             = "mock/../scripts/robot-chat-ack.yaml"
+	mockModelDelayed         = "mock/../scripts/robot-chat-delayed.yaml"
 
 	mockModelLibrarySearchPages = "mock/../scripts/robot-chat-library-search-pages.yaml"
 	mockModelContentSearch      = "mock/../scripts/robot-chat-content-search.yaml"
@@ -33,13 +34,37 @@ const (
 	mockModelMemberSearch       = "mock/../scripts/robot-chat-member-search.yaml"
 )
 
+func robotToolsetsPtr(ids ...string) *openapi.RobotToolsetRefList {
+	toolsets := openapi.RobotToolsetRefList(ids)
+	return &toolsets
+}
+
 func robotToolsPtr(names ...string) *openapi.RobotToolNameList {
 	tools := openapi.RobotToolNameList(names)
 	return &tools
 }
 
+func robotIDPtr(robotID string) *string {
+	robotID = strings.TrimSpace(robotID)
+	if robotID == "" {
+		return nil
+	}
+	return &robotID
+}
+
 type fullResponse struct {
-	parts []openapi.StreamPart
+	parts       []openapi.StreamPart
+	usedLiveSSE bool
+}
+
+type delegationStreamData struct {
+	StreamID string                 `json:"-"`
+	CallID   string                 `json:"callId"`
+	Robot    openapi.RobotReference `json:"robot"`
+	Request  string                 `json:"request"`
+	Status   string                 `json:"status"`
+	Messages []openapi.UIMessage    `json:"messages"`
+	Error    string                 `json:"error,omitempty"`
 }
 
 func doChat(
@@ -52,14 +77,12 @@ func doChat(
 	t.Helper()
 
 	var textPart openapi.UIMessagePart
-	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.Text, Text: message}))
-
-	robotID = normaliseRobotID(robotID)
+	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.TextUIPartTypeText, Text: message}))
 
 	body, err := json.Marshal(openapi.RobotChatRequest{
 		Id:        sessionID,
 		SessionId: &sessionID,
-		RobotId:   &robotID,
+		RobotId:   robotIDPtr(robotID),
 		Messages: []openapi.UIMessage{{
 			Id:    xid.New().String(),
 			Role:  openapi.UIMessageRoleUser,
@@ -68,7 +91,7 @@ func doChat(
 	})
 	require.NoError(t, err)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/sse/chat", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/robots/sessions", bytes.NewReader(body))
 	require.NoError(t, err)
 	httpReq.Header.Set("Content-Type", "application/json")
 	require.NoError(t, session(ctx, httpReq))
@@ -77,28 +100,8 @@ func doChat(
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	ev := &fullResponse{}
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			break
-		}
-		var part openapi.StreamPart
-		if err := json.Unmarshal([]byte(data), &part); err != nil {
-			continue
-		}
-		ev.parts = append(ev.parts, part)
-	}
-	require.NoError(t, scanner.Err())
-
-	return ev
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	return readDurableChatParts(t, ctx, ts, session, resp)
 }
 
 func doChatToolOutput(
@@ -131,21 +134,22 @@ func doChatToolOutputs(
 ) *fullResponse {
 	t.Helper()
 
-	robotID = normaliseRobotID(robotID)
-
-	body, err := json.Marshal(map[string]any{
+	requestBody := map[string]any{
 		"id":        sessionID,
 		"sessionId": sessionID,
-		"robotId":   robotID,
 		"messages": []map[string]any{{
 			"id":    xid.New().String(),
 			"role":  "assistant",
 			"parts": parts,
 		}},
-	})
+	}
+	if robotID = strings.TrimSpace(robotID); robotID != "" {
+		requestBody["robotId"] = robotID
+	}
+	body, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/sse/chat", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/robots/sessions", bytes.NewReader(body))
 	require.NoError(t, err)
 	httpReq.Header.Set("Content-Type", "application/json")
 	require.NoError(t, session(ctx, httpReq))
@@ -154,35 +158,24 @@ func doChatToolOutputs(
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	ev := &fullResponse{}
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			break
-		}
-		var part openapi.StreamPart
-		if err := json.Unmarshal([]byte(data), &part); err != nil {
-			continue
-		}
-		ev.parts = append(ev.parts, part)
-	}
-	require.NoError(t, scanner.Err())
-
-	return ev
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	return readDurableChatParts(t, ctx, ts, session, resp)
 }
 
-func normaliseRobotID(robotID string) string {
-	if robotID == "" {
-		return agent_registry.RobotBuilderID
-	}
-	return robotID
+func readDurableChatParts(
+	t *testing.T,
+	ctx context.Context,
+	ts *httptest.Server,
+	session openapi.RequestEditorFn,
+	created *http.Response,
+) *fullResponse {
+	t.Helper()
+
+	location := created.Header.Get("Location")
+	require.NotEmpty(t, location)
+	read, err := robottest.ReadDurableJSON[openapi.StreamPart](ctx, ts.URL+location, session)
+	require.NoError(t, err)
+	return &fullResponse{parts: read.Items, usedLiveSSE: read.UsedLiveSSE}
 }
 
 func collectToolInputs(ev *fullResponse) []openapi.ToolInputAvailablePart {
@@ -226,17 +219,25 @@ func doChatStatus(
 	session openapi.RequestEditorFn,
 	sessionID, message string,
 ) int {
+	return doChatWithRobotStatus(t, ctx, ts, session, sessionID, "", message)
+}
+
+func doChatWithRobotStatus(
+	t *testing.T,
+	ctx context.Context,
+	ts *httptest.Server,
+	session openapi.RequestEditorFn,
+	sessionID, robotID, message string,
+) int {
 	t.Helper()
 
 	var textPart openapi.UIMessagePart
-	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.Text, Text: message}))
-
-	robotID := normaliseRobotID("")
+	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.TextUIPartTypeText, Text: message}))
 
 	body, err := json.Marshal(openapi.RobotChatRequest{
 		Id:        sessionID,
 		SessionId: &sessionID,
-		RobotId:   &robotID,
+		RobotId:   robotIDPtr(robotID),
 		Messages: []openapi.UIMessage{{
 			Id:    xid.New().String(),
 			Role:  openapi.UIMessageRoleUser,
@@ -245,7 +246,7 @@ func doChatStatus(
 	})
 	require.NoError(t, err)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/sse/chat", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/robots/sessions", bytes.NewReader(body))
 	require.NoError(t, err)
 	httpReq.Header.Set("Content-Type", "application/json")
 	require.NoError(t, session(ctx, httpReq))
@@ -267,21 +268,22 @@ func doChatToolOutputsStatus(
 ) int {
 	t.Helper()
 
-	robotID = normaliseRobotID(robotID)
-
-	body, err := json.Marshal(map[string]any{
+	requestBody := map[string]any{
 		"id":        sessionID,
 		"sessionId": sessionID,
-		"robotId":   robotID,
 		"messages": []map[string]any{{
 			"id":    xid.New().String(),
 			"role":  "assistant",
 			"parts": parts,
 		}},
-	})
+	}
+	if robotID = strings.TrimSpace(robotID); robotID != "" {
+		requestBody["robotId"] = robotID
+	}
+	body, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/sse/chat", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/robots/sessions", bytes.NewReader(body))
 	require.NoError(t, err)
 	httpReq.Header.Set("Content-Type", "application/json")
 	require.NoError(t, session(ctx, httpReq))
@@ -302,6 +304,20 @@ func collectTextDeltas(ev *fullResponse) []string {
 		p, err := part.AsTextDeltaPart()
 		if err == nil {
 			deltas = append(deltas, p.Delta)
+		}
+	}
+	return deltas
+}
+
+func collectReasoningDeltas(ev *fullResponse) []string {
+	var deltas []string
+	for _, part := range ev.parts {
+		if part.Type != "reasoning-delta" {
+			continue
+		}
+		reasoning, err := part.AsReasoningDeltaPart()
+		if err == nil {
+			deltas = append(deltas, reasoning.Delta)
 		}
 	}
 	return deltas
@@ -347,6 +363,31 @@ func collectErrorParts(ev *fullResponse) []string {
 		}
 	}
 	return errs
+}
+
+func collectDelegations(ev *fullResponse) []delegationStreamData {
+	var delegations []delegationStreamData
+	for _, part := range ev.parts {
+		if part.Type != "data-delegation" {
+			continue
+		}
+		dataPart, err := part.AsDataPart()
+		if err != nil {
+			continue
+		}
+		encoded, err := json.Marshal(dataPart.Data)
+		if err != nil {
+			continue
+		}
+		var delegation delegationStreamData
+		if err := json.Unmarshal(encoded, &delegation); err == nil {
+			if dataPart.Id != nil {
+				delegation.StreamID = *dataPart.Id
+			}
+			delegations = append(delegations, delegation)
+		}
+	}
+	return delegations
 }
 
 func writeScript(t *testing.T, path, content string) {

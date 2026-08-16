@@ -360,6 +360,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
 		{Name: "email_address", Type: field.TypeString, Unique: true, Size: 254},
 		{Name: "verification_code", Type: field.TypeString, Size: 6},
+		{Name: "verification_code_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "verification_attempts", Type: field.TypeInt, Default: "0"},
 		{Name: "verified", Type: field.TypeBool, Default: "false"},
 		{Name: "account_id", Type: field.TypeString, Nullable: true, Size: 20},
 	}
@@ -371,7 +373,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "emails_accounts_emails",
-				Columns:    []*schema.Column{EmailsColumns[5]},
+				Columns:    []*schema.Column{EmailsColumns[7]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -971,7 +973,7 @@ var (
 			},
 			{
 				Name:    "oauthdeviceauthorisation_user_code_hash",
-				Unique:  false,
+				Unique:  true,
 				Columns: []*schema.Column{OauthDeviceAuthorisationsColumns[3]},
 			},
 		},
@@ -1404,6 +1406,7 @@ var (
 		{Name: "playbook", Type: field.TypeString},
 		{Name: "model", Type: field.TypeString},
 		{Name: "tools", Type: field.TypeJSON, Nullable: true},
+		{Name: "toolsets", Type: field.TypeJSON, Nullable: true},
 		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
 		{Name: "author_id", Type: field.TypeString, Size: 20},
 		{Name: "workspace_id", Type: field.TypeString, Nullable: true, Size: 20},
@@ -1416,13 +1419,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "robots_accounts_robots",
-				Columns:    []*schema.Column{RobotsColumns[9]},
+				Columns:    []*schema.Column{RobotsColumns[10]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "robots_robot_workspaces_robots",
-				Columns:    []*schema.Column{RobotsColumns[10]},
+				Columns:    []*schema.Column{RobotsColumns[11]},
 				RefColumns: []*schema.Column{RobotWorkspacesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1549,6 +1552,12 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "name", Type: field.TypeString},
 		{Name: "state", Type: field.TypeJSON, Nullable: true},
+		{Name: "execution_status", Type: field.TypeEnum, Enums: []string{"idle", "running", "blocked"}, Default: "idle"},
+		{Name: "active_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "lease_token", Type: field.TypeString, Nullable: true},
+		{Name: "lease_generation", Type: field.TypeUint64, Default: 0},
+		{Name: "next_event_sequence", Type: field.TypeUint64, Default: 0},
+		{Name: "lease_expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "account_id", Type: field.TypeString, Size: 20},
 	}
 	// RobotSessionsTable holds the schema information for the "robot_sessions" table.
@@ -1558,10 +1567,10 @@ var (
 		PrimaryKey: []*schema.Column{RobotSessionsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "robot_sessions_accounts_robot_sessions",
-				Columns:    []*schema.Column{RobotSessionsColumns[5]},
+				Symbol:     "robot_sessions_accounts_created_robot_sessions",
+				Columns:    []*schema.Column{RobotSessionsColumns[11]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.Cascade,
+				OnDelete:   schema.Restrict,
 			},
 		},
 	}
@@ -1569,9 +1578,15 @@ var (
 	RobotSessionMessagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Size: 20},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
-		{Name: "invocation_id", Type: field.TypeString},
+		{Name: "turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "sequence", Type: field.TypeUint64},
+		{Name: "event_kind", Type: field.TypeEnum, Enums: []string{"message", "turn_queued", "turn_completed", "turn_blocked", "turn_failed", "turn_cancelled"}, Default: "message"},
+		{Name: "invocation_id", Type: field.TypeString, Nullable: true},
+		{Name: "branch", Type: field.TypeString, Nullable: true},
+		{Name: "isolation_scope", Type: field.TypeString, Nullable: true},
 		{Name: "builtin_robot", Type: field.TypeString, Nullable: true},
-		{Name: "event_data", Type: field.TypeJSON},
+		{Name: "event_data", Type: field.TypeJSON, Nullable: true},
+		{Name: "error_text", Type: field.TypeString, Nullable: true},
 		{Name: "account_id", Type: field.TypeString, Nullable: true, Size: 20},
 		{Name: "robot_id", Type: field.TypeString, Nullable: true, Size: 20},
 		{Name: "session_id", Type: field.TypeString, Size: 20},
@@ -1584,19 +1599,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "robot_session_messages_accounts_robot_messages",
-				Columns:    []*schema.Column{RobotSessionMessagesColumns[5]},
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[11]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "robot_session_messages_robots_messages",
-				Columns:    []*schema.Column{RobotSessionMessagesColumns[6]},
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[12]},
 				RefColumns: []*schema.Column{RobotsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "robot_session_messages_robot_sessions_messages",
-				Columns:    []*schema.Column{RobotSessionMessagesColumns[7]},
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[13]},
 				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -1605,7 +1620,141 @@ var (
 			{
 				Name:    "robotsessionmessage_session_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RobotSessionMessagesColumns[7], RobotSessionMessagesColumns[1]},
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[1]},
+			},
+			{
+				Name:    "robotsessionmessage_session_id_sequence",
+				Unique:  true,
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[3]},
+			},
+			{
+				Name:    "robotsessionmessage_session_id_turn_id_sequence",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[2], RobotSessionMessagesColumns[3]},
+			},
+		},
+	}
+	// RobotSessionTurnsColumns holds the columns for the "robot_session_turns" table.
+	RobotSessionTurnsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "source_kind", Type: field.TypeString},
+		{Name: "robot_ref", Type: field.TypeString},
+		{Name: "input_data", Type: field.TypeJSON, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"queued", "running", "completed", "blocked", "failed", "cancelled"}, Default: "queued"},
+		{Name: "continuation_of_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
+		{Name: "error_text", Type: field.TypeString, Nullable: true},
+		{Name: "initiated_by_account_id", Type: field.TypeString, Nullable: true, Size: 20},
+		{Name: "session_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionTurnsTable holds the schema information for the "robot_session_turns" table.
+	RobotSessionTurnsTable = &schema.Table{
+		Name:       "robot_session_turns",
+		Columns:    RobotSessionTurnsColumns,
+		PrimaryKey: []*schema.Column{RobotSessionTurnsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_session_turns_accounts_initiated_robot_turns",
+				Columns:    []*schema.Column{RobotSessionTurnsColumns[11]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "robot_session_turns_robot_sessions_turns",
+				Columns:    []*schema.Column{RobotSessionTurnsColumns[12]},
+				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotsessionturn_session_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionTurnsColumns[12], RobotSessionTurnsColumns[6], RobotSessionTurnsColumns[1]},
+			},
+			{
+				Name:    "robotsessionturn_initiated_by_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionTurnsColumns[11], RobotSessionTurnsColumns[1]},
+			},
+		},
+	}
+	// RobotSessionViewsColumns holds the columns for the "robot_session_views" table.
+	RobotSessionViewsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "last_accessed_at", Type: field.TypeTime},
+		{Name: "resume_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "last_seen_event_sequence", Type: field.TypeUint64, Default: 0},
+		{Name: "account_id", Type: field.TypeString, Size: 20},
+		{Name: "session_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionViewsTable holds the schema information for the "robot_session_views" table.
+	RobotSessionViewsTable = &schema.Table{
+		Name:       "robot_session_views",
+		Columns:    RobotSessionViewsColumns,
+		PrimaryKey: []*schema.Column{RobotSessionViewsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_session_views_accounts_robot_session_views",
+				Columns:    []*schema.Column{RobotSessionViewsColumns[6]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robot_session_views_robot_sessions_views",
+				Columns:    []*schema.Column{RobotSessionViewsColumns[7]},
+				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotsessionview_session_id_account_id",
+				Unique:  true,
+				Columns: []*schema.Column{RobotSessionViewsColumns[7], RobotSessionViewsColumns[6]},
+			},
+			{
+				Name:    "robotsessionview_account_id_last_accessed_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionViewsColumns[6], RobotSessionViewsColumns[3]},
+			},
+		},
+	}
+	// RobotToolsetsColumns holds the columns for the "robot_toolsets" table.
+	RobotToolsetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "instruction", Type: field.TypeString, Nullable: true},
+		{Name: "tools", Type: field.TypeJSON, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "author_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotToolsetsTable holds the schema information for the "robot_toolsets" table.
+	RobotToolsetsTable = &schema.Table{
+		Name:       "robot_toolsets",
+		Columns:    RobotToolsetsColumns,
+		PrimaryKey: []*schema.Column{RobotToolsetsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_toolsets_accounts_robot_toolsets",
+				Columns:    []*schema.Column{RobotToolsetsColumns[8]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robottoolset_author_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{RobotToolsetsColumns[8], RobotToolsetsColumns[3]},
 			},
 		},
 	}
@@ -1688,6 +1837,7 @@ var (
 	SessionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Size: 20},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "token_hash", Type: field.TypeString, Unique: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
 		{Name: "account_id", Type: field.TypeString, Size: 20},
@@ -1700,7 +1850,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sessions_accounts_sessions",
-				Columns:    []*schema.Column{SessionsColumns[4]},
+				Columns:    []*schema.Column{SessionsColumns[5]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -2003,6 +2153,9 @@ var (
 		RobotProviderModelsTable,
 		RobotSessionsTable,
 		RobotSessionMessagesTable,
+		RobotSessionTurnsTable,
+		RobotSessionViewsTable,
+		RobotToolsetsTable,
 		RobotWorkspacesTable,
 		RobotWorkspaceInstancesTable,
 		RolesTable,
@@ -2100,6 +2253,11 @@ func init() {
 	RobotSessionMessagesTable.ForeignKeys[0].RefTable = AccountsTable
 	RobotSessionMessagesTable.ForeignKeys[1].RefTable = RobotsTable
 	RobotSessionMessagesTable.ForeignKeys[2].RefTable = RobotSessionsTable
+	RobotSessionTurnsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionTurnsTable.ForeignKeys[1].RefTable = RobotSessionsTable
+	RobotSessionViewsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionViewsTable.ForeignKeys[1].RefTable = RobotSessionsTable
+	RobotToolsetsTable.ForeignKeys[0].RefTable = AccountsTable
 	RobotWorkspacesTable.ForeignKeys[0].RefTable = AccountsTable
 	RobotWorkspaceInstancesTable.ForeignKeys[0].RefTable = AccountsTable
 	RobotWorkspaceInstancesTable.ForeignKeys[1].RefTable = RobotWorkspacesTable

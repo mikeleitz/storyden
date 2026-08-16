@@ -105,6 +105,8 @@ var (
 
 const accountGetCacheControl = "private, no-cache"
 
+func ptr[T any](v T) *T { return &v }
+
 func (i *Accounts) AccountGet(ctx context.Context, request openapi.AccountGetRequestObject) (openapi.AccountGetResponseObject, error) {
 	accountID, err := session.GetAccountID(ctx)
 	if err != nil {
@@ -115,9 +117,8 @@ func (i *Accounts) AccountGet(ctx context.Context, request openapi.AccountGetReq
 	if notModified {
 		return openapi.AccountGet304Response{
 			Headers: openapi.NotModifiedResponseHeaders{
-				CacheControl: accountGetCacheControl,
-				LastModified: cachecontrol.HTTPDate(etag.Time),
-				ETag:         etag.String(),
+				CacheControl: ptr(accountGetCacheControl),
+				ETag:         ptr(etag.String()),
 			},
 		}, nil
 	}
@@ -136,9 +137,8 @@ func (i *Accounts) AccountGet(ctx context.Context, request openapi.AccountGetReq
 		AccountGetOKJSONResponse: openapi.AccountGetOKJSONResponse{
 			Body: serialiseAccount(acc),
 			Headers: openapi.AccountGetOKResponseHeaders{
-				CacheControl: accountGetCacheControl,
-				LastModified: cachecontrol.HTTPDate(etag.Time),
-				ETag:         etag.String(),
+				CacheControl: ptr(accountGetCacheControl),
+				ETag:         ptr(etag.String()),
 			},
 		},
 	}, nil
@@ -159,8 +159,7 @@ func (i *Accounts) AccountView(ctx context.Context, request openapi.AccountViewR
 		AccountGetOKJSONResponse: openapi.AccountGetOKJSONResponse{
 			Body: serialiseAccount(acc),
 			Headers: openapi.AccountGetOKResponseHeaders{
-				CacheControl: "private, no-cache",
-				LastModified: cachecontrol.HTTPDate(acc.UpdatedAt),
+				CacheControl: ptr("private, no-cache"),
 			},
 		},
 	}, nil
@@ -207,8 +206,7 @@ func (i *Accounts) AccountManageCreate(ctx context.Context, request openapi.Acco
 		AccountGetOKJSONResponse: openapi.AccountGetOKJSONResponse{
 			Body: serialiseAccount(acc),
 			Headers: openapi.AccountGetOKResponseHeaders{
-				CacheControl: "private, no-cache",
-				LastModified: cachecontrol.HTTPDate(acc.UpdatedAt),
+				CacheControl: ptr("private, no-cache"),
 			},
 		},
 	}, nil
@@ -249,8 +247,7 @@ func (i *Accounts) AccountManageUpdate(ctx context.Context, request openapi.Acco
 		AccountGetOKJSONResponse: openapi.AccountGetOKJSONResponse{
 			Body: serialiseAccount(acc),
 			Headers: openapi.AccountGetOKResponseHeaders{
-				CacheControl: "private, no-cache",
-				LastModified: cachecontrol.HTTPDate(acc.UpdatedAt),
+				CacheControl: ptr("private, no-cache"),
 			},
 		},
 	}, nil
@@ -619,7 +616,7 @@ func (i *Accounts) AccountGetAvatar(ctx context.Context, request openapi.Account
 			Body:          r,
 			ContentLength: size,
 			Headers: openapi.AccountGetAvatarResponseHeaders{
-				CacheControl: "public, max-age=3600",
+				CacheControl: ptr("public, max-age=3600"),
 			},
 		},
 	}, nil

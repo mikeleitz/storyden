@@ -6,6 +6,7 @@ import { parseAsBoolean, useQueryState } from "nuqs";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { handle } from "@/api/client";
 import { useProfileGet } from "@/api/openapi-client/profiles";
 import {
   Account,
@@ -13,12 +14,10 @@ import {
   ProfileGetOKResponse,
 } from "@/api/openapi-schema";
 import { useSession } from "@/auth";
-
-import { handle } from "@/api/client";
 import { useProfileMutations } from "@/lib/profile/mutation";
+import { UsernameSchema } from "@/lib/auth/schemas";
 import type { SignatureConfig } from "@/lib/settings/settings";
 import { hasPermissionOr } from "@/utils/permissions";
-import { isSlug } from "@/utils/slugify";
 
 export type Props = {
   initialSession?: Account;
@@ -28,14 +27,7 @@ export type Props = {
 
 export const FormSchema = z.object({
   name: z.string().min(1, "Please enter a name."),
-  handle: z
-    .string()
-    .min(1, "Please enter a handle")
-    .max(30, "Handle must be 30 characters or less")
-    .refine(isSlug, {
-      message:
-        "Handle can only contain letters, numbers, hyphens, and underscores",
-    }),
+  handle: UsernameSchema,
 
   bio: z.string(),
   signature: z.string(),

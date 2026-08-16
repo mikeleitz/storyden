@@ -129,10 +129,10 @@ func (a *Authentication) AuthProviderLogout(ctx context.Context, request openapi
 
 	return openapi.AuthProviderLogout302Response{
 		Headers: openapi.AuthProviderLogout302ResponseHeaders{
-			SetCookie:     a.cj.Destroy().String(),
-			ClearSiteData: `"cache", "cookies", "storage", "executionContexts"`,
-			CacheControl:  "no-cache, no-store, must-revalidate",
-			Location:      redirectTo.String(),
+			SetCookie:     ptr(a.cj.Destroy().String()),
+			ClearSiteData: ptr(`"cache", "cookies", "storage", "executionContexts"`),
+			CacheControl:  ptr("no-cache, no-store, must-revalidate"),
+			Location:      ptr(redirectTo.String()),
 		},
 	}, nil
 }
@@ -220,16 +220,29 @@ func serialiseAuthProvider(redirectFn func(authentication.Service) url.URL) func
 			}
 			return openapi.AuthProvider{
 				Provider: p.Service().String(),
-				Name:     fmt.Sprintf("%v", p.Service()),
+				Name:     providerName(p),
 				Link:     &link,
 			}, nil
 		}
 
 		return openapi.AuthProvider{
 			Provider: p.Service().String(),
-			Name:     fmt.Sprintf("%v", p.Service()),
+			Name:     providerName(p),
 		}, nil
 	}
+}
+
+// providerName returns the provider's configured display name if it
+// implements DisplayNamer, otherwise falling back to the name derived from
+// its Service() identifier.
+func providerName(p auth_svc.Provider) string {
+	if dn, ok := p.(auth_svc.DisplayNamer); ok {
+		if name := dn.DisplayName(); name != "" {
+			return name
+		}
+	}
+
+	return fmt.Sprintf("%v", p.Service())
 }
 
 func deserialiseAuthMode(in openapi.AuthMode) (authentication.Mode, error) {

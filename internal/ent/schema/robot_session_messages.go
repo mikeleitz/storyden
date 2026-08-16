@@ -6,7 +6,18 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/rs/xid"
+	adksession "google.golang.org/adk/v2/session"
 )
+
+type RobotSessionEvent adksession.Event
+
+func NewRobotSessionEvent(event adksession.Event) RobotSessionEvent {
+	return RobotSessionEvent(event)
+}
+
+func (event RobotSessionEvent) ADK() adksession.Event {
+	return adksession.Event(event)
+}
 
 type RobotSessionMessage struct {
 	ent.Schema
@@ -19,9 +30,28 @@ func (RobotSessionMessage) Mixin() []ent.Mixin {
 func (RobotSessionMessage) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("session_id").GoType(xid.ID{}),
+		field.String("turn_id").
+			GoType(xid.ID{}).
+			Optional().
+			Nillable().
+			Comment("Robot turn that produced this ordered session event."),
+		field.Uint64("sequence").
+			Comment("Monotonic event offset within the session."),
+		field.Enum("event_kind").
+			Values("message", "turn_queued", "turn_completed", "turn_blocked", "turn_failed", "turn_cancelled").
+			Default("message"),
 
 		field.String("invocation_id").
+			Optional().
 			Comment("Invocation ID from ADK Event"),
+
+		field.String("branch").
+			Optional().
+			Comment("ADK agent branch path used to attribute delegated work"),
+
+		field.String("isolation_scope").
+			Optional().
+			Comment("ADK exact-match history scope for private sub-agent events"),
 
 		field.String("robot_id").
 			GoType(xid.ID{}).
@@ -40,14 +70,22 @@ func (RobotSessionMessage) Fields() []ent.Field {
 			Nillable().
 			Comment("Author account ID from ADK Event, optional for system messages"),
 
-		field.JSON("event_data", map[string]any{}).
+		field.JSON("event_data", RobotSessionEvent{}).
+			Optional().
 			Comment("Full ADK Event object stored as JSON"),
+
+		field.String("error_text").
+			Optional().
+			Nillable().
+			Comment("Terminal failure presented to clients."),
 	}
 }
 
 func (RobotSessionMessage) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("session_id", "created_at"),
+		index.Fields("session_id", "sequence").Unique(),
+		index.Fields("session_id", "turn_id", "sequence"),
 	}
 }
 

@@ -2,7 +2,7 @@
 # BACKEND API LAYER
 #
 
-FROM docker.io/golang:1.26.4-alpine AS api-builder
+FROM docker.io/golang:1.26.5-alpine AS api-builder
 
 WORKDIR /server
 
@@ -45,6 +45,7 @@ FROM base AS builder
 WORKDIR /storyden
 COPY --from=deps /storyden/node_modules ./node_modules
 COPY ./web .
+COPY --from=api-builder /server/storyden-api ./storyden-api
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_BUILD_STANDALONE=true
@@ -76,7 +77,7 @@ COPY --from=builder /storyden/public ./public
 
 RUN mkdir .next && mkdir data
 
-COPY --from=api-builder --chown=storyden:storyden /server/storyden-api ./storyden-api
+COPY --from=builder --chown=storyden:storyden /storyden/storyden-api ./storyden-api
 COPY --from=builder --chown=storyden:storyden /storyden/.next/standalone ./
 COPY --from=builder --chown=storyden:storyden /storyden/.next/static ./.next/static
 

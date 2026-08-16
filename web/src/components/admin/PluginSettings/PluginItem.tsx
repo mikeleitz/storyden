@@ -1,4 +1,5 @@
 import { formatDate } from "date-fns";
+import Link from "next/link";
 import { useSWRConfig } from "swr";
 
 import { mutateTransaction } from "@/api/mutate";
@@ -10,12 +11,12 @@ import { Plugin, PluginListOKResponse } from "@/api/openapi-schema";
 import { useConfirmation } from "@/components/site/useConfirmation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heading } from "@/components/ui/heading";
-import { HStack, LStack, WStack, styled } from "@/styled-system/jsx";
-import { CardBox as cardBox } from "@/styled-system/patterns";
+import { CardBox } from "@/components/ui/card-box";
+import { Text } from "@/components/ui/text";
+import { HStack, LStack, WStack } from "@/styled-system/jsx";
+import { linkOverlay } from "@/styled-system/patterns";
 
 import { PluginStatusBadge } from "./PluginStatusBadge";
-import { useSelectedPlugin } from "./useSelectedPlugin";
 import { isPluginStatusError } from "./utils";
 
 type Props = {
@@ -23,7 +24,6 @@ type Props = {
 };
 
 export function PluginItem({ plugin }: Props) {
-  const [_, setSelectedPlugin] = useSelectedPlugin();
   const { mutate } = useSWRConfig();
 
   const { trigger: deletePlugin } = usePluginDelete(plugin.id);
@@ -51,20 +51,24 @@ export function PluginItem({ plugin }: Props) {
 
   const isError = plugin.status.active_state === "error";
 
-  const handleSelectPlugin = () => {
-    setSelectedPlugin(plugin.id);
-  };
-
   return (
-    <li className={cardBox()}>
+    <CardBox as="li" position="relative">
       <LStack>
         <WStack alignItems="center" justifyContent="space-between">
           <HStack alignItems="center">
-            <a href="#" onClick={handleSelectPlugin}>
-              <Heading lineClamp="1" size="sm">
+            <Link
+              className={linkOverlay()}
+              href={`/admin/plugins/${plugin.id}`}
+            >
+              <Text
+                variant="supporting"
+                color="text.default"
+                fontWeight="semibold"
+                lineClamp="1"
+              >
                 {plugin.name}
-              </Heading>
-            </a>
+              </Text>
+            </Link>
             <PluginVersionBadge plugin={plugin} />
           </HStack>
 
@@ -72,27 +76,26 @@ export function PluginItem({ plugin }: Props) {
         </WStack>
 
         <WStack alignItems="end">
-          <styled.p fontSize="xs" color="fg.muted">
+          <Text variant="metadata">
             Installed: <time>{formatDate(plugin.added_at, "PPpp")}</time>
-          </styled.p>
+          </Text>
 
-          <HStack>
+          <HStack position="relative" zIndex="docked">
             {isConfirming ? (
               <>
                 <Button
-                  size="xs"
                   variant="subtle"
-                  bgColor="bg.destructive"
+                  bgColor="status.danger.surface"
                   onClick={handleConfirmAction}
                 >
                   Confirm Delete
                 </Button>
-                <Button size="xs" variant="subtle" onClick={handleCancelAction}>
+                <Button variant="subtle" onClick={handleCancelAction}>
                   Cancel
                 </Button>
               </>
             ) : (
-              <Button size="xs" variant="subtle" onClick={handleConfirmAction}>
+              <Button variant="subtle" onClick={handleConfirmAction}>
                 Delete
               </Button>
             )}
@@ -100,12 +103,12 @@ export function PluginItem({ plugin }: Props) {
         </WStack>
 
         {isError && isPluginStatusError(plugin.status) && (
-          <styled.p fontSize="xs" color="fg.error">
+          <Text variant="metadata" color="status.danger.content">
             Error: {plugin.status.message}
-          </styled.p>
+          </Text>
         )}
       </LStack>
-    </li>
+    </CardBox>
   );
 }
 

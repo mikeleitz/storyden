@@ -150,7 +150,7 @@ func (v *Validator) ValidateAccessKeyToken(ctx context.Context, raw string) (con
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	return WithAccessKey(ctx, *acc, roles), nil
+	return WithAccessKeyOfKind(ctx, *acc, roles, ark.Kind), nil
 }
 
 // ValidateOAuthToken validates an OAuth access token and returns a context with account info.
@@ -168,7 +168,14 @@ func (v *Validator) ValidateOAuthToken(ctx context.Context, raw string) (context
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	return WithOAuthToken(ctx, *acc, result.Permissions, result.Scopes), nil
+	roles, err := v.resolveRolesForAccount(ctx, acc)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	granted := result.Permissions.Intersect(roles.Permissions())
+
+	return WithOAuthToken(ctx, *acc, granted, result.Scopes), nil
 }
 
 // WithUnauthenticatedRoles returns a context with guest role permissions.

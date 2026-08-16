@@ -214,7 +214,11 @@ type OperationPermissions interface {
 	RobotsList() (bool, *rbac.Permission)
 	RobotCreate() (bool, *rbac.Permission)
 	RobotToolsList() (bool, *rbac.Permission)
-	RobotChatSSE() (bool, *rbac.Permission)
+	RobotToolsetsList() (bool, *rbac.Permission)
+	RobotToolsetCreate() (bool, *rbac.Permission)
+	RobotToolsetGet() (bool, *rbac.Permission)
+	RobotToolsetUpdate() (bool, *rbac.Permission)
+	RobotToolsetDelete() (bool, *rbac.Permission)
 	RobotProvidersList() (bool, *rbac.Permission)
 	RobotProviderUpdate() (bool, *rbac.Permission)
 	RobotProviderModelsRefresh() (bool, *rbac.Permission)
@@ -231,7 +235,11 @@ type OperationPermissions interface {
 	RobotGet() (bool, *rbac.Permission)
 	RobotUpdate() (bool, *rbac.Permission)
 	RobotDelete() (bool, *rbac.Permission)
+	RobotSessionCreate() (bool, *rbac.Permission)
 	RobotSessionsList() (bool, *rbac.Permission)
+	RobotSessionStream() (bool, *rbac.Permission)
+	RobotSessionTurnGet() (bool, *rbac.Permission)
+	RobotSessionTurnHead() (bool, *rbac.Permission)
 	RobotSessionGet() (bool, *rbac.Permission)
 	RobotMCPServersList() (bool, *rbac.Permission)
 	RobotMCPServerCreate() (bool, *rbac.Permission)
@@ -666,8 +674,16 @@ func GetOperationPermission(optable OperationPermissions, op string) (bool, *rba
 		return optable.RobotCreate()
 	case "RobotToolsList":
 		return optable.RobotToolsList()
-	case "RobotChatSSE":
-		return optable.RobotChatSSE()
+	case "RobotToolsetsList":
+		return optable.RobotToolsetsList()
+	case "RobotToolsetCreate":
+		return optable.RobotToolsetCreate()
+	case "RobotToolsetGet":
+		return optable.RobotToolsetGet()
+	case "RobotToolsetUpdate":
+		return optable.RobotToolsetUpdate()
+	case "RobotToolsetDelete":
+		return optable.RobotToolsetDelete()
 	case "RobotProvidersList":
 		return optable.RobotProvidersList()
 	case "RobotProviderUpdate":
@@ -700,8 +716,16 @@ func GetOperationPermission(optable OperationPermissions, op string) (bool, *rba
 		return optable.RobotUpdate()
 	case "RobotDelete":
 		return optable.RobotDelete()
+	case "RobotSessionCreate":
+		return optable.RobotSessionCreate()
 	case "RobotSessionsList":
 		return optable.RobotSessionsList()
+	case "RobotSessionStream":
+		return optable.RobotSessionStream()
+	case "RobotSessionTurnGet":
+		return optable.RobotSessionTurnGet()
+	case "RobotSessionTurnHead":
+		return optable.RobotSessionTurnHead()
 	case "RobotSessionGet":
 		return optable.RobotSessionGet()
 	case "RobotMCPServersList":

@@ -7,14 +7,13 @@ import { useEffect, useState } from "react";
 import { datagraphMatches } from "@/api/openapi-client/datagraph";
 import { DatagraphMatch } from "@/api/openapi-schema";
 import { useSession } from "@/auth";
-import { Spinner } from "@/components/ui/Spinner";
 import { IconButton } from "@/components/ui/icon-button";
 import { AdminIcon } from "@/components/ui/icons/Admin";
-import { CloseIcon } from "@/components/ui/icons/Close";
 import { DiscussionIcon } from "@/components/ui/icons/Discussion";
 import { HomeIcon } from "@/components/ui/icons/Home";
 import { RobotIcon } from "@/components/ui/icons/Robot";
 import { SettingsIcon } from "@/components/ui/icons/Settings";
+import { Spinner } from "@/components/ui/spinner";
 import { HStack, LStack } from "@/styled-system/jsx";
 
 import "./styles.css";
@@ -28,8 +27,7 @@ import { RobotChatMessageList } from "./RobotChat/RobotChatMessageList";
 export function CommandPaletteContent() {
   const { search, setSearch, mode, setMode, focusInput, canUseRobots } =
     useCommandPalette();
-  const { activeRobotName, sendMessage, status, stopGenerating } =
-    useRobotChat();
+  const { activeRobotName, sendMessage, status } = useRobotChat();
   const filteredCount = useCommandState((s) => s.filtered.count);
   const selectedValue = useCommandState((s) => s.value);
 
@@ -95,19 +93,13 @@ export function CommandPaletteContent() {
         />
         {canUseRobots && mode === "chat" && (
           <IconButton
-            aria-label={
-              isBusy
-                ? "Cancel Robot response"
-                : mode === "chat"
-                  ? "Send message"
-                  : "Start robot chat"
-            }
+            aria-label="Send message"
             variant="subtle"
             type="button"
-            disabled={!isBusy && !search.trim()}
-            onClick={isBusy ? () => void stopGenerating() : handleChatSend}
+            disabled={isBusy || !search.trim()}
+            onClick={handleChatSend}
           >
-            {isBusy ? <CloseIcon /> : <DiscussionIcon />}
+            <DiscussionIcon />
           </IconButton>
         )}
       </HStack>

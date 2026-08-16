@@ -1,7 +1,6 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import type { JSONSchema7 } from "json-schema";
 import {
   PropsWithChildren,
@@ -15,26 +14,22 @@ import {
 } from "react";
 import { useSWRConfig } from "swr";
 
+import { createDurableChatTransport } from "@/api/durable-chat-transport";
 import {
+  getRobotToolsetsListKey,
   getRobotsListKey,
   robotSessionGet,
+  useRobotGet,
   useRobotSessionsList,
   useRobotWorkspacesList,
-  useRobotsList,
 } from "@/api/openapi-client/robots";
 import { getThreadListKey } from "@/api/openapi-client/threads";
-import {
-  Robot,
-  RobotList,
-  RobotSessionList,
-  RobotWorkspaceList,
-} from "@/api/openapi-schema";
+import { RobotSessionList, RobotWorkspaceList } from "@/api/openapi-schema";
 import {
   TOOL_NAMES,
   ToolInputMap,
   ToolLibraryRequestPageOutput,
   ToolName,
-  ToolRobotSwitchOutput,
 } from "@/api/robots";
 import { StorydenUIMessage, toStorydenUIMessages } from "@/api/robots-types";
 import mcpSchema from "@/api/robots.json";
@@ -48,6 +43,9 @@ const MUTATIVE_ROBOT_TOOLS: ToolName[] = [
   "robot_create",
   "robot_update",
   "robot_delete",
+  "toolset_create",
+  "toolset_update",
+  "toolset_delete",
 ];
 
 const MUTATIVE_THREAD_TOOLS: ToolName[] = [
@@ -56,26 +54,8 @@ const MUTATIVE_THREAD_TOOLS: ToolName[] = [
   "thread_reply",
 ];
 
-export const DEFAULT_ROBOT_ID = "robot_builder";
-
-export const PLUGIN_BUILDER_ROBOT_ID = "plugin_builder";
-
-export const DEFAULT_ROBOT_NAME = "Storyden Robot Builder";
-
-export type RobotSelection = Pick<Robot, "id" | "name">;
-
-export const DEFAULT_ROBOT: RobotSelection = {
-  id: DEFAULT_ROBOT_ID,
-  name: DEFAULT_ROBOT_NAME,
-};
-
-export const BUILT_IN_ROBOTS: RobotSelection[] = [
-  DEFAULT_ROBOT,
-  {
-    id: PLUGIN_BUILDER_ROBOT_ID,
-    name: "Plugin Builder",
-  },
-];
+export const DENBOT_NAME = "Denbot";
+export const DENBOT_ID = "denbot";
 
 function threadListKeyFilterFn(key: unknown) {
   if (!Array.isArray(key)) return false;
@@ -114,29 +94,15 @@ function isStorydenToolCall(
   return !toolCall.dynamic && isKnownToolName(toolCall.toolName);
 }
 
-function findRobotSelection(
-  id: string,
-  robots: RobotList,
-): RobotSelection | undefined {
-  return (
-    BUILT_IN_ROBOTS.find((robot) => robot.id === id) ??
-    robots.find((robot) => robot.id === id)
-  );
-}
-
 type RobotChatContextValue = {
   sessionId: string;
   activeRobotName: string;
-  selectedRobot?: RobotSelection;
-  setSelectedRobot: (r: RobotSelection | undefined) => void;
-  robots: RobotList;
   selectedWorkspaceID?: string;
   setSelectedWorkspaceID: (workspaceID: string | undefined) => void;
   workspaces: RobotWorkspaceList;
   workspacesReady: boolean;
   sessions: RobotSessionList;
   sendMessage: (input: { text: string }) => Promise<void>;
-  stopGenerating: () => Promise<void>;
   messages: StorydenUIMessage[];
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
@@ -171,7 +137,7 @@ type RobotChatContextProps = PropsWithChildren<{
   initialSessionID?: string;
   initialMessages?: StorydenUIMessage[];
   initialNextBefore?: string;
-  initialSelectedRobotID?: string;
+  initialRootRobotID?: string;
   initialSelectedWorkspaceID?: string;
 }>;
 
@@ -180,23 +146,18 @@ export function RobotChatContext({
   initialSessionID,
   initialMessages,
   initialNextBefore,
-  initialSelectedRobotID,
+  initialRootRobotID,
   initialSelectedWorkspaceID,
 }: RobotChatContextProps) {
-  // TODO: Expose this error in a user-friendly manner.
-  const { data, error } = useRobotsList();
+  const rootRobotID = initialRootRobotID ?? DENBOT_ID;
+  const { data: rootRobot } = useRobotGet(rootRobotID, {
+    swr: { enabled: rootRobotID !== DENBOT_ID },
+  });
   const { data: workspacesData } = useRobotWorkspacesList();
   const { data: sessionsData, mutate: mutateSessionList } =
     useRobotSessionsList();
-  // NOTE: Annoying workaround for useChat caching the onToolCall function...
-  const dataRef = useRef(data);
-  const errorRef = useRef(error);
 
   const { mutate } = useSWRConfig();
-  const [selectedRobot, setSelectedRobot] = useState<
-    RobotSelection | undefined
-  >(DEFAULT_ROBOT);
-  const selectedRobotRef = useRef<RobotSelection | undefined>(DEFAULT_ROBOT);
   const [selectedWorkspaceID, setSelectedWorkspaceID] = useState<
     string | undefined
   >(initialSelectedWorkspaceID);
@@ -204,7 +165,6 @@ export function RobotChatContext({
     initialSelectedWorkspaceID,
   );
   const autoSubmittedToolOutputIDsRef = useRef<Set<string>>(new Set());
-  const didHydrateInitialSelectedRobotRef = useRef(false);
   const [sessionId] = useState(() => initialSessionID ?? generateXid());
   const [isSessionConfirmed, setIsSessionConfirmed] =
     useState(!!initialSessionID);
@@ -215,39 +175,6 @@ export function RobotChatContext({
 
   const [errorState, setErrorState] = useState<string | undefined>(undefined);
   const getPageContext = useRobotPageContext();
-
-  useEffect(() => {
-    dataRef.current = data;
-    errorRef.current = error;
-  }, [data, error]);
-
-  useEffect(() => {
-    if (didHydrateInitialSelectedRobotRef.current) return;
-    if (!data) return;
-
-    didHydrateInitialSelectedRobotRef.current = true;
-
-    if (!initialSelectedRobotID) {
-      selectedRobotRef.current = DEFAULT_ROBOT;
-      setSelectedRobot(DEFAULT_ROBOT);
-      return;
-    }
-
-    const robot = findRobotSelection(initialSelectedRobotID, data.robots);
-    if (robot) {
-      selectedRobotRef.current = robot;
-      setSelectedRobot(robot);
-    }
-  }, [data, initialSelectedRobotID]);
-
-  const handleSetSelectedRobot = useCallback(
-    (robot: RobotSelection | undefined) => {
-      const nextRobot = robot ?? DEFAULT_ROBOT;
-      selectedRobotRef.current = nextRobot;
-      setSelectedRobot(nextRobot);
-    },
-    [],
-  );
 
   const handleSetSelectedWorkspaceID = useCallback(
     (workspaceID: string | undefined) => {
@@ -271,49 +198,44 @@ export function RobotChatContext({
   }, [handleSetSelectedWorkspaceID, selectedWorkspaceID, workspacesData]);
 
   const transport = useMemo(() => {
-    return new DefaultChatTransport({
-      api: `${API_ADDRESS}/sse/chat`,
-      credentials: "include",
-      prepareSendMessagesRequest: async (request) => {
-        const pageContext = await getPageContext();
-        const currentSelectedRobot = selectedRobotRef.current ?? DEFAULT_ROBOT;
-        const currentWorkspaceID = selectedWorkspaceIDRef.current;
+    const fetchClient: typeof fetch = async (input, init) => {
+      let request: RequestInit = {
+        ...init,
+        credentials: "include",
+      };
 
-        return {
+      if (init?.method?.toUpperCase() === "POST") {
+        const body =
+          typeof init.body === "string"
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {};
+        const pageContext = await getPageContext();
+
+        request = {
           ...request,
-          body: {
-            ...request.body,
-            id: request.id,
-            messages: request.messages,
-            trigger: request.trigger,
-            messageId: request.messageId,
-            robotId: currentSelectedRobot.id ?? request.body?.["robotId"],
-            context: pageContext ?? request.body?.["context"],
-            workspace: currentWorkspaceID
-              ? { workspace_id: currentWorkspaceID }
-              : undefined,
-          },
+          body: JSON.stringify({
+            ...body,
+            robotId: rootRobotID === DENBOT_ID ? undefined : rootRobotID,
+            context: pageContext ?? body["context"],
+            workspace: selectedWorkspaceID
+              ? { workspace_id: selectedWorkspaceID }
+              : body["workspace"],
+          }),
         };
-      },
+      }
+
+      return fetch(input, request);
+    };
+
+    return createDurableChatTransport<StorydenUIMessage>({
+      api: `${API_ADDRESS}/api/robots/sessions`,
+      fetchClient,
     });
-  }, [getPageContext]);
+  }, [getPageContext, rootRobotID, selectedWorkspaceID]);
 
   const handleToolCall = useCallback(
     async ({ toolCall }: HandleToolCallOptions) => {
       console.debug("[RobotChat] onToolCall", toolCall);
-
-      const currentData = dataRef.current;
-      const currentError = errorRef.current;
-
-      if (!currentData) {
-        throw new Error("Robot list not loaded yet");
-      }
-
-      if (currentError) {
-        throw new Error(
-          `Cannot perform tool call: ${deriveError(currentError)}`,
-        );
-      }
 
       if (!isStorydenToolCall(toolCall)) {
         const toolName = toolCall.toolName;
@@ -323,50 +245,21 @@ export function RobotChatContext({
 
       const toolName = toolCall.toolName;
 
-      if (toolName === "robot_delete" || toolName === "library_request_page") {
+      if (
+        toolName === "robot_delete" ||
+        toolName === "toolset_delete" ||
+        toolName === "library_request_page"
+      ) {
         return;
-      }
-
-      switch (toolName) {
-        case "robot_switch": {
-          const input = toolCall.input;
-
-          const robot = findRobotSelection(input.robot_id, currentData.robots);
-          if (!robot) {
-            console.error(
-              `Robot not found: ${input.robot_id} list: ${currentData.robots}`,
-            );
-            return;
-          }
-
-          console.debug(
-            "[RobotChat] Switching to robot:",
-            robot.id,
-            robot.name,
-          );
-
-          handleSetSelectedRobot(robot);
-
-          const output: ToolRobotSwitchOutput = {
-            success: true,
-            robot_id: input.robot_id,
-          };
-
-          chat.addToolOutput({
-            tool: toolName,
-            toolCallId: toolCall.toolCallId,
-            state: "output-available",
-            output,
-          });
-
-          return;
-        }
       }
 
       // NOTE: When a tool is called that internally mutates the robot list
       // (create, update, delete), we need to tell SWR to re-validate the list.
       if (MUTATIVE_ROBOT_TOOLS.includes(toolName)) {
-        await mutate(getRobotsListKey());
+        await Promise.all([
+          mutate(getRobotsListKey()),
+          mutate(getRobotToolsetsListKey()),
+        ]);
       }
 
       // NOTE: When a tool is called that internally mutates threads
@@ -375,13 +268,14 @@ export function RobotChatContext({
         await mutate(threadListKeyFilterFn);
       }
     },
-    [handleSetSelectedRobot, mutate],
+    [mutate],
   );
 
   const chat = useChat<StorydenUIMessage>({
     id: sessionId,
     messages: initialMessages,
     transport,
+    resume: true,
     onError: async (e) => {
       console.error("[RobotChat] Chat error:", e);
       setErrorState(deriveError(e));
@@ -390,6 +284,12 @@ export function RobotChatContext({
       console.debug(`[RobotChat] Session data`, message);
 
       switch (message.type) {
+        case "data-session_id": {
+          if (message.data === sessionId) {
+            setIsSessionConfirmed(true);
+          }
+          break;
+        }
         case "data-session_name": {
           // Mark session as confirmed when we receive session name from backend
           setIsSessionConfirmed(true);
@@ -528,14 +428,13 @@ export function RobotChatContext({
     initialMessagesSignature,
   ]);
 
-  // Wrapper around chat.sendMessage that includes robot_id and context
+  // Wrapper around chat.sendMessage that includes page and workspace context.
   const sendMessage = useCallback(
     async (input: { text: string }) => {
       const pageContext = await getPageContext();
       const currentWorkspaceID = selectedWorkspaceIDRef.current;
       await chat.sendMessage(input, {
         body: {
-          robotId: selectedRobot?.id,
           context: pageContext,
           workspace: currentWorkspaceID
             ? { workspace_id: currentWorkspaceID }
@@ -543,7 +442,7 @@ export function RobotChatContext({
         },
       });
     },
-    [chat.sendMessage, selectedRobot?.id, getPageContext],
+    [chat.sendMessage, getPageContext],
   );
 
   const loadOlderMessages = useCallback(async () => {
@@ -614,7 +513,10 @@ export function RobotChatContext({
       }
 
       if (MUTATIVE_ROBOT_TOOLS.includes(input.toolName)) {
-        await mutate(getRobotsListKey());
+        await Promise.all([
+          mutate(getRobotsListKey()),
+          mutate(getRobotToolsetsListKey()),
+        ]);
       }
 
       if (MUTATIVE_THREAD_TOOLS.includes(input.toolName)) {
@@ -639,27 +541,21 @@ export function RobotChatContext({
     [chat],
   );
 
-  const stopGenerating = useCallback(async () => {
-    await chat.stop();
-  }, [chat]);
-
   function handleDismissError() {
     setErrorState(undefined);
   }
 
   const value: RobotChatContextValue = {
     sessionId,
-    activeRobotName: selectedRobot?.name ?? DEFAULT_ROBOT_NAME,
-    selectedRobot,
-    setSelectedRobot: handleSetSelectedRobot,
-    robots: data?.robots ?? [],
+    activeRobotName:
+      rootRobot?.name ??
+      (rootRobotID === DENBOT_ID ? DENBOT_NAME : "Custom Robot"),
     selectedWorkspaceID,
     setSelectedWorkspaceID: handleSetSelectedWorkspaceID,
     workspaces: workspacesData?.workspaces ?? [],
     workspacesReady: !!workspacesData,
     sessions: sessionsData?.sessions ?? [],
     sendMessage,
-    stopGenerating,
     messages: chat.messages,
     hasOlderMessages: Boolean(nextBefore),
     isLoadingOlderMessages,

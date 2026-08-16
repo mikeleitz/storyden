@@ -363,7 +363,7 @@ func (a *Admin) AuditEventList(ctx context.Context, request openapi.AuditEventLi
 	return openapi.AuditEventList200JSONResponse{
 		AuditEventListOKJSONResponse: openapi.AuditEventListOKJSONResponse{
 			CurrentPage: result.CurrentPage,
-			Events:      &eventList,
+			Events:      eventList,
 			NextPage:    result.NextPage.Ptr(),
 			PageSize:    result.Size,
 			Results:     result.Results,
@@ -424,7 +424,7 @@ func (a *Admin) EmailQueueList(ctx context.Context, request openapi.EmailQueueLi
 	return openapi.EmailQueueList200JSONResponse{
 		EmailQueueListOKJSONResponse: openapi.EmailQueueListOKJSONResponse{
 			CurrentPage: result.CurrentPage,
-			Emails:      &emailList,
+			Emails:      emailList,
 			NextPage:    result.NextPage.Ptr(),
 			PageSize:    result.Size,
 			Results:     result.Results,
@@ -868,15 +868,15 @@ func (i *Admin) AdminOAuthRefreshTokenList(ctx context.Context, request openapi.
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	tokens, err := i.oauth.ListRefreshTokens(ctx)
+	pageParams := deserialisePageParams(request.Params.Page, 50)
+
+	result, err := i.oauth.ListRefreshTokens(ctx, pageParams)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
 	return openapi.AdminOAuthRefreshTokenList200JSONResponse{
-		OAuthRefreshTokenListOKJSONResponse: openapi.OAuthRefreshTokenListOKJSONResponse(openapi.OAuthRefreshTokenListResult{
-			Tokens: serialiseOAuthRefreshTokenList(tokens),
-		}),
+		OAuthRefreshTokenListOKJSONResponse: openapi.OAuthRefreshTokenListOKJSONResponse(serialiseOAuthRefreshTokenListResult(result)),
 	}, nil
 }
 

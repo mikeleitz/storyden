@@ -14,7 +14,6 @@ import (
 	"github.com/Southclaws/storyden/app/resources/account/account_writer"
 	"github.com/Southclaws/storyden/app/resources/seed"
 	"github.com/Southclaws/storyden/app/transports/http/openapi"
-	"github.com/Southclaws/storyden/app/transports/sse"
 	"github.com/Southclaws/storyden/internal/config"
 	"github.com/Southclaws/storyden/internal/integration"
 	"github.com/Southclaws/storyden/internal/integration/e2e"
@@ -30,7 +29,6 @@ func TestRobotSessionGetSharedAcrossRobotUsers(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelAck),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -79,7 +77,6 @@ func TestRobotSessionsListNoFilterReturnsAllSessions(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelAck),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -124,7 +121,7 @@ func TestRobotSessionsListNoFilterReturnsAllSessions(t *testing.T) {
 	)
 }
 
-func TestSSEChatCanContinueSessionOwnedByAnotherRobotUser(t *testing.T) {
+func TestSSEChatCanContinueSessionCreatedByAnotherRobotUser(t *testing.T) {
 	t.Parallel()
 	integration.Test(t,
 		&config.Config{
@@ -132,7 +129,6 @@ func TestSSEChatCanContinueSessionOwnedByAnotherRobotUser(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelAck),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -142,30 +138,40 @@ func TestSSEChatCanContinueSessionOwnedByAnotherRobotUser(t *testing.T) {
 			aw *account_writer.Writer,
 		) {
 			lc.Append(fx.StartHook(func() {
-				ownerCtx, _ := e2e.WithAccount(root, aw, seed.Account_001_Odin)
-				ownerSession := sh.WithSession(ownerCtx)
+				creatorCtx, creator := e2e.WithAccount(root, aw, seed.Account_001_Odin)
+				creatorSession := sh.WithSession(creatorCtx)
 
-				attackerCtx, _ := e2e.WithAccount(root, aw, seed.Account_002_Frigg)
-				attackerSession := sh.WithSession(attackerCtx)
+				memberCtx, member := e2e.WithAccount(root, aw, seed.Account_002_Frigg)
+				memberSession := sh.WithSession(memberCtx)
 
 				sharedSessionID := xid.New().String()
 
-				doChat(t, root, ts, ownerSession, sharedSessionID, "", "initial turn")
+				doChat(t, root, ts, creatorSession, sharedSessionID, "", "initial turn")
 
-				t.Run("other_robot_user_can_post_to_owners_session", func(t *testing.T) {
+				t.Run("other_robot_user_can_post_to_shared_session", func(t *testing.T) {
 					a := assert.New(t)
 
-					doChat(t, root, ts, attackerSession, sharedSessionID, "", "attacker message")
+					doChat(t, root, ts, memberSession, sharedSessionID, "", "member message")
 
 					limit := openapi.RobotSessionMessageLimitQuery("10")
 					resp := tests.AssertRequest(cl.RobotSessionGetWithResponse(root,
 						openapi.RobotSessionIDParam(sharedSessionID),
 						&openapi.RobotSessionGetParams{Limit: &limit},
-						attackerSession,
+						memberSession,
 					))(t, http.StatusOK)
 					require.NotNil(t, resp.JSON200)
 
 					a.GreaterOrEqual(resp.JSON200.MessageList.Results, 2)
+					a.Equal(creator.ID.String(), string(resp.JSON200.CreatedBy.Id))
+
+					foundMemberMessage := false
+					for _, message := range resp.JSON200.MessageList.Messages {
+						if message.Author != nil && string(message.Author.Id) == member.ID.String() {
+							foundMemberMessage = true
+							break
+						}
+					}
+					a.True(foundMemberMessage, "the turn initiator must be the human message author")
 				})
 			}))
 		}),

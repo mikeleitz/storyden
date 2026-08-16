@@ -852,7 +852,19 @@ func (m *Mapping) RobotCreate() (bool, *rbac.Permission) {
 	return true, &rbac.PermissionManageRobots
 }
 
-func (m *Mapping) RobotChatSSE() (bool, *rbac.Permission) {
+func (m *Mapping) RobotSessionCreate() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotSessionStream() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotSessionTurnGet() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotSessionTurnHead() (bool, *rbac.Permission) {
 	return true, &rbac.PermissionUseRobots
 }
 
@@ -909,7 +921,27 @@ func (m *Mapping) RobotWorkspaceInstanceDelete() (bool, *rbac.Permission) {
 }
 
 func (m *Mapping) RobotToolsList() (bool, *rbac.Permission) {
-	return true, &rbac.PermissionManageRobots
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotToolsetsList() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotToolsetCreate() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotToolsetGet() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotToolsetUpdate() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
+}
+
+func (m *Mapping) RobotToolsetDelete() (bool, *rbac.Permission) {
+	return true, &rbac.PermissionUseRobots
 }
 
 func (m *Mapping) RobotMCPServersList() (bool, *rbac.Permission) {

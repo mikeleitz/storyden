@@ -16,7 +16,6 @@ import (
 	"github.com/Southclaws/storyden/app/resources/account/account_writer"
 	"github.com/Southclaws/storyden/app/resources/seed"
 	"github.com/Southclaws/storyden/app/transports/http/openapi"
-	"github.com/Southclaws/storyden/app/transports/sse"
 	"github.com/Southclaws/storyden/internal/config"
 	"github.com/Southclaws/storyden/internal/integration"
 	"github.com/Southclaws/storyden/internal/integration/e2e"
@@ -32,7 +31,6 @@ func TestRobotChatContentSearch(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelContentSearch),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -49,7 +47,7 @@ func TestRobotChatContentSearch(t *testing.T) {
 					Name:        "content-search-robot-" + xid.New().String(),
 					Description: "robot for content search tool tests",
 					Playbook:    "you are a test robot",
-					Tools:       robotToolsPtr("content_search"),
+					Toolsets:    robotToolsetsPtr("system.content_search"),
 				}, adminSession))(t, http.StatusOK)
 				robotID := string(rob.JSON200.Id)
 
@@ -100,7 +98,6 @@ func TestRobotChatThreadSearch(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelThreadSearch),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -117,7 +114,7 @@ func TestRobotChatThreadSearch(t *testing.T) {
 					Name:        "thread-search-robot-" + xid.New().String(),
 					Description: "robot for thread search tool tests",
 					Playbook:    "you are a test robot",
-					Tools:       robotToolsPtr("thread_search"),
+					Toolsets:    robotToolsetsPtr("system.content_search"),
 				}, adminSession))(t, http.StatusOK)
 				robotID := string(rob.JSON200.Id)
 
@@ -159,7 +156,6 @@ func TestRobotChatReplySearch(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelReplySearch),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -176,7 +172,7 @@ func TestRobotChatReplySearch(t *testing.T) {
 					Name:        "reply-search-robot-" + xid.New().String(),
 					Description: "robot for reply search tool tests",
 					Playbook:    "you are a test robot",
-					Tools:       robotToolsPtr("reply_search"),
+					Toolsets:    robotToolsetsPtr("system.content_search"),
 				}, adminSession))(t, http.StatusOK)
 				robotID := string(rob.JSON200.Id)
 
@@ -222,7 +218,6 @@ func TestRobotChatPostSearch(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelPostSearch),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -239,7 +234,7 @@ func TestRobotChatPostSearch(t *testing.T) {
 					Name:        "post-search-robot-" + xid.New().String(),
 					Description: "robot for post search tool tests",
 					Playbook:    "you are a test robot",
-					Tools:       robotToolsPtr("post_search"),
+					Toolsets:    robotToolsetsPtr("system.content_search"),
 				}, adminSession))(t, http.StatusOK)
 				robotID := string(rob.JSON200.Id)
 
@@ -281,7 +276,6 @@ func TestRobotChatMemberSearch(t *testing.T) {
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModelMemberSearch),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -298,7 +292,7 @@ func TestRobotChatMemberSearch(t *testing.T) {
 					Name:        "member-search-robot-" + xid.New().String(),
 					Description: "robot for member search tool tests",
 					Playbook:    "you are a test robot",
-					Tools:       robotToolsPtr("member_search"),
+					Toolsets:    robotToolsetsPtr("system.content_search"),
 				}, adminSession))(t, http.StatusOK)
 				robotID := string(rob.JSON200.Id)
 

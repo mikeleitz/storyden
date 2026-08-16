@@ -324,6 +324,9 @@ func (w *Writer) CreateDeviceAuthorisation(ctx context.Context, input DeviceAuth
 		SetPollIntervalSeconds(input.PollIntervalSeconds).
 		Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, fault.Wrap(err, fctx.With(ctx), ftag.With(ftag.AlreadyExists))
+		}
 		return nil, wrapWriteError(ctx, err)
 	}
 
@@ -492,6 +495,20 @@ func (w *Writer) DeleteExpiredDeviceAuthorisations(ctx context.Context, now time
 func (w *Writer) DeleteExpiredAuthorisationRequests(ctx context.Context, now time.Time) (int, error) {
 	deleted, err := w.db.OAuthAuthorisationRequest.Delete().
 		Where(oauthauthorisationrequest.ExpiresAtLT(now)).
+		Exec(ctx)
+	if err != nil {
+		return 0, wrapWriteError(ctx, err)
+	}
+
+	return deleted, nil
+}
+
+func (w *Writer) DeleteExpiredRefreshTokens(ctx context.Context, before time.Time) (int, error) {
+	deleted, err := w.db.OAuthRefreshToken.Delete().
+		Where(
+			oauthrefreshtoken.ExpiresAtLT(before),
+			oauthrefreshtoken.ReplacedByTokenIDIsNil(),
+		).
 		Exec(ctx)
 	if err != nil {
 		return 0, wrapWriteError(ctx, err)

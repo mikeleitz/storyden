@@ -6,11 +6,10 @@ import "encoding/json"
 import "fmt"
 import "reflect"
 import "regexp"
-import "unicode/utf8"
 
 type CategoryItem struct {
 	// Category description
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Category name
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
@@ -121,10 +120,10 @@ type LibraryPageSearchItem struct {
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Page content excerpt
-	Content *string `json:"content,omitempty,omitzero" yaml:"content,omitempty" mapstructure:"content,omitempty"`
+	Content *string `json:"content,omitempty" yaml:"content,omitempty" mapstructure:"content,omitempty"`
 
 	// Brief description
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -178,13 +177,48 @@ type LibraryPageTreeNode struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 
 	// Slug of the parent page (omitted for root pages)
-	Parent *string `json:"parent,omitempty,omitzero" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
+	Parent *string `json:"parent,omitempty" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
 
 	// URL-friendly identifier for the page
 	Slug string `json:"slug" yaml:"slug" mapstructure:"slug"`
 
 	// Tags associated with this page
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+
+	// Current publishing workflow state.
+	Visibility LibraryPageTreeNodeVisibility `json:"visibility" yaml:"visibility" mapstructure:"visibility"`
+}
+
+type LibraryPageTreeNodeVisibility string
+
+const LibraryPageTreeNodeVisibilityDraft LibraryPageTreeNodeVisibility = "draft"
+const LibraryPageTreeNodeVisibilityPublished LibraryPageTreeNodeVisibility = "published"
+const LibraryPageTreeNodeVisibilityReview LibraryPageTreeNodeVisibility = "review"
+
+var enumValues_LibraryPageTreeNodeVisibility = []interface{}{
+	"draft",
+	"review",
+	"published",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LibraryPageTreeNodeVisibility) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_LibraryPageTreeNodeVisibility {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_LibraryPageTreeNodeVisibility, v)
+	}
+	*j = LibraryPageTreeNodeVisibility(v)
+	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -208,6 +242,9 @@ func (j *LibraryPageTreeNode) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["slug"]; raw != nil && !ok {
 		return fmt.Errorf("field slug in LibraryPageTreeNode: required")
 	}
+	if _, ok := raw["visibility"]; raw != nil && !ok {
+		return fmt.Errorf("field visibility in LibraryPageTreeNode: required")
+	}
 	type Plain LibraryPageTreeNode
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
@@ -219,7 +256,7 @@ func (j *LibraryPageTreeNode) UnmarshalJSON(value []byte) error {
 
 type MemberSearchItem struct {
 	// Brief member bio or description
-	Bio *string `json:"bio,omitempty,omitzero" yaml:"bio,omitempty" mapstructure:"bio,omitempty"`
+	Bio *string `json:"bio,omitempty" yaml:"bio,omitempty" mapstructure:"bio,omitempty"`
 
 	// Browser URL for this resource. Always present this as a Markdown link when
 	// showing results to the user.
@@ -268,7 +305,7 @@ type PostSearchItem struct {
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Brief excerpt
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -321,7 +358,7 @@ type PropertySchemaField struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 
 	// Sort key for ordering fields
-	Sort *string `json:"sort,omitempty,omitzero" yaml:"sort,omitempty" mapstructure:"sort,omitempty"`
+	Sort *string `json:"sort,omitempty" yaml:"sort,omitempty" mapstructure:"sort,omitempty"`
 
 	// Data type of the field
 	Type PropertySchemaFieldType `json:"type" yaml:"type" mapstructure:"type"`
@@ -330,7 +367,7 @@ type PropertySchemaField struct {
 type PropertySchemaFieldMutation struct {
 	// Field ID - if provided, updates an existing field. If omitted, creates a new
 	// field.
-	Id *string `json:"id,omitempty,omitzero" yaml:"id,omitempty" mapstructure:"id,omitempty"`
+	Id *string `json:"id,omitempty" yaml:"id,omitempty" mapstructure:"id,omitempty"`
 
 	// Display name of the field
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
@@ -390,7 +427,7 @@ func (j *PropertySchemaFieldMutation) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+	if len(plain.Name) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
 	}
 	*j = PropertySchemaFieldMutation(plain)
@@ -561,7 +598,7 @@ type PropertyValueResult struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 
 	// Data type of the field
-	Type *PropertyValueResultType `json:"type,omitempty,omitzero" yaml:"type,omitempty" mapstructure:"type,omitempty"`
+	Type *PropertyValueResultType `json:"type,omitempty" yaml:"type,omitempty" mapstructure:"type,omitempty"`
 
 	// The current value of this property
 	Value string `json:"value" yaml:"value" mapstructure:"value"`
@@ -631,7 +668,7 @@ type ReplySearchItem struct {
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Brief excerpt from the reply
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -673,17 +710,17 @@ func (j *ReplySearchItem) UnmarshalJSON(value []byte) error {
 type RobotChatContext struct {
 	// Optional reference to a datagraph item if the user is viewing one (e.g., a
 	// thread, library page, profile)
-	DatagraphItem *DatagraphItemRef `json:"datagraph_item,omitempty,omitzero" yaml:"datagraph_item,omitempty" mapstructure:"datagraph_item,omitempty"`
+	DatagraphItem *DatagraphItemRef `json:"datagraph_item,omitempty" yaml:"datagraph_item,omitempty" mapstructure:"datagraph_item,omitempty"`
 
 	// Human-readable page type if not viewing a specific datagraph item. Examples:
 	// 'Index page', 'Settings page', 'Admin page', 'Search page'. This is free-form
 	// text since the backend doesn't know about frontend routes.
-	PageType *string `json:"page_type,omitempty,omitzero" yaml:"page_type,omitempty" mapstructure:"page_type,omitempty"`
+	PageType *string `json:"page_type,omitempty" yaml:"page_type,omitempty" mapstructure:"page_type,omitempty"`
 }
 
 type RobotItem struct {
 	// Human-readable description of the Robot's purpose
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -713,13 +750,132 @@ func (j *RobotItem) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type RobotSearchResult struct {
+	// Delegation target name.
+	DelegateTo string `json:"delegate_to" yaml:"delegate_to" mapstructure:"delegate_to"`
+
+	// Description corresponds to the JSON schema field "description".
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RobotSearchResult) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["delegate_to"]; raw != nil && !ok {
+		return fmt.Errorf("field delegate_to in RobotSearchResult: required")
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in RobotSearchResult: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in RobotSearchResult: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in RobotSearchResult: required")
+	}
+	type Plain RobotSearchResult
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = RobotSearchResult(plain)
+	return nil
+}
+
+// A tool candidate returned by capability discovery; use its ID with tool_get
+// before choosing or loading it.
+type RobotToolCatalogueItemYaml struct {
+	// The outcome this tool can achieve, used to decide whether its full schema is
+	// worth inspecting.
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Stable tool identifier accepted by tool_get, tool_load, and Robot configuration
+	// tools.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Human-readable tool title that helps distinguish similar capabilities.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RobotToolCatalogueItemYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in RobotToolCatalogueItemYaml: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in RobotToolCatalogueItemYaml: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in RobotToolCatalogueItemYaml: required")
+	}
+	type Plain RobotToolCatalogueItemYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = RobotToolCatalogueItemYaml(plain)
+	return nil
+}
+
+// A reusable capability bundle returned by discovery; use its ID with toolset_get
+// before loading or assigning it.
+type RobotToolsetCatalogueItemYaml struct {
+	// The jobs this Toolset is designed to handle, used to decide whether its tools
+	// and instruction are worth inspecting.
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Stable Toolset identifier accepted by toolset_get, toolset_load, and Robot
+	// configuration tools.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Human-readable Toolset name that identifies the capability bundle.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RobotToolsetCatalogueItemYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in RobotToolsetCatalogueItemYaml: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in RobotToolsetCatalogueItemYaml: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in RobotToolsetCatalogueItemYaml: required")
+	}
+	type Plain RobotToolsetCatalogueItemYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = RobotToolsetCatalogueItemYaml(plain)
+	return nil
+}
+
 type SearchedItem struct {
 	// Browser URL for this resource. Always present this as a Markdown link when
 	// showing results to the user.
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Brief description or excerpt
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -799,7 +955,7 @@ type ThreadSearchItem struct {
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Brief excerpt from the thread
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -898,8 +1054,6 @@ func (j *ThreadSummary) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type ToolCategoryListInput map[string]interface{}
-
 type ToolCategoryListOutput struct {
 	// Categories corresponds to the JSON schema field "categories".
 	Categories []CategoryItem `json:"categories" yaml:"categories" mapstructure:"categories"`
@@ -926,7 +1080,7 @@ func (j *ToolCategoryListOutput) UnmarshalJSON(value []byte) error {
 // List all thread categories with their names and descriptions
 type ToolCategoryListYaml struct {
 	// Input corresponds to the JSON schema field "input".
-	Input ToolCategoryListInput `json:"input" yaml:"input" mapstructure:"input"`
+	Input map[string]interface{} `json:"input" yaml:"input" mapstructure:"input"`
 
 	// Output corresponds to the JSON schema field "output".
 	Output ToolCategoryListOutput `json:"output" yaml:"output" mapstructure:"output"`
@@ -955,17 +1109,17 @@ func (j *ToolCategoryListYaml) UnmarshalJSON(value []byte) error {
 
 type ToolContentSearchInput struct {
 	// Filter by author handles (usernames). Do not use '@' prefix.
-	Authors []string `json:"authors,omitempty,omitzero" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
+	Authors []string `json:"authors,omitempty" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
 
 	// Filter by category names (for forum threads). Category names are
 	// case-insensitive.
-	Categories []string `json:"categories,omitempty,omitzero" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
+	Categories []string `json:"categories,omitempty" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
 
 	// Filter by content types.
-	Kind []DatagraphItemKindYaml `json:"kind,omitempty,omitzero" yaml:"kind,omitempty" mapstructure:"kind,omitempty"`
+	Kind []DatagraphItemKindYaml `json:"kind,omitempty" yaml:"kind,omitempty" mapstructure:"kind,omitempty"`
 
 	// Maximum number of results to return (default 10, max 100)
-	MaxResults *int `json:"max_results,omitempty,omitzero" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
 
 	// Plain text keyword search string. Boolean operators like OR, AND, and NOT,
 	// quoted phrases, and other special query syntax are not supported. Use simple
@@ -973,7 +1127,7 @@ type ToolContentSearchInput struct {
 	Query string `json:"query" yaml:"query" mapstructure:"query"`
 
 	// Filter by tag names. Tags are case-sensitive.
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -996,7 +1150,7 @@ func (j *ToolContentSearchInput) UnmarshalJSON(value []byte) error {
 	if plain.MaxResults != nil && 1 > *plain.MaxResults {
 		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolContentSearchInput(plain)
@@ -1063,64 +1217,29 @@ func (j *ToolContentSearchYaml) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type ToolInfo struct {
-	// Brief description of what the tool does
-	Description string `json:"description" yaml:"description" mapstructure:"description"`
-
-	// The tool name identifier
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
-
-	// Whether Robot runs must pause for human approval before executing this tool.
-	RequiresConfirmation bool `json:"requires_confirmation" yaml:"requires_confirmation" mapstructure:"requires_confirmation"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *ToolInfo) UnmarshalJSON(value []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(value, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["description"]; raw != nil && !ok {
-		return fmt.Errorf("field description in ToolInfo: required")
-	}
-	if _, ok := raw["name"]; raw != nil && !ok {
-		return fmt.Errorf("field name in ToolInfo: required")
-	}
-	if _, ok := raw["requires_confirmation"]; raw != nil && !ok {
-		return fmt.Errorf("field requires_confirmation in ToolInfo: required")
-	}
-	type Plain ToolInfo
-	var plain Plain
-	if err := json.Unmarshal(value, &plain); err != nil {
-		return err
-	}
-	*j = ToolInfo(plain)
-	return nil
-}
-
 type ToolLibraryPageCreateInput struct {
 	// The content of the page in HTML format
-	Content *string `json:"content,omitempty,omitzero" yaml:"content,omitempty" mapstructure:"content,omitempty"`
+	Content *string `json:"content,omitempty" yaml:"content,omitempty" mapstructure:"content,omitempty"`
 
 	// The name/title of the page
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 
 	// Slug of the parent page. Only include if you already have a parent slug
 	// available. Leave empty to create a root-level page.
-	Parent *string `json:"parent,omitempty,omitzero" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
+	Parent *string `json:"parent,omitempty" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
 
 	// The unique slug for this page. If not provided, one will be generated from the
 	// name.
-	Slug *string `json:"slug,omitempty,omitzero" yaml:"slug,omitempty" mapstructure:"slug,omitempty"`
+	Slug *string `json:"slug,omitempty" yaml:"slug,omitempty" mapstructure:"slug,omitempty"`
 
 	// Optional tags to categorise this page
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// Optional external URL if this page references a topic on another website
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// Visibility of the page (default: published)
-	Visibility *ToolLibraryPageCreateInputVisibility `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *ToolLibraryPageCreateInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 type ToolLibraryPageCreateInputVisibility string
@@ -1167,7 +1286,7 @@ func (j *ToolLibraryPageCreateInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+	if len(plain.Name) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
 	}
 	*j = ToolLibraryPageCreateInput(plain)
@@ -1266,7 +1385,7 @@ func (j *ToolLibraryPageGetInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolLibraryPageGetInput(plain)
@@ -1281,8 +1400,11 @@ type ToolLibraryPageGetOutput struct {
 	// Slugs of child pages
 	ChildPages []string `json:"child_pages" yaml:"child_pages" mapstructure:"child_pages"`
 
+	// Plain-text page body for evaluating or summarising the page.
+	Content string `json:"content" yaml:"content" mapstructure:"content"`
+
 	// Brief description of the page
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier for the page
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -1295,6 +1417,41 @@ type ToolLibraryPageGetOutput struct {
 
 	// Tags associated with this page
 	Tags []string `json:"tags" yaml:"tags" mapstructure:"tags"`
+
+	// Current publishing workflow state.
+	Visibility ToolLibraryPageGetOutputVisibility `json:"visibility" yaml:"visibility" mapstructure:"visibility"`
+}
+
+type ToolLibraryPageGetOutputVisibility string
+
+const ToolLibraryPageGetOutputVisibilityDraft ToolLibraryPageGetOutputVisibility = "draft"
+const ToolLibraryPageGetOutputVisibilityPublished ToolLibraryPageGetOutputVisibility = "published"
+const ToolLibraryPageGetOutputVisibilityReview ToolLibraryPageGetOutputVisibility = "review"
+
+var enumValues_ToolLibraryPageGetOutputVisibility = []interface{}{
+	"draft",
+	"review",
+	"published",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolLibraryPageGetOutputVisibility) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ToolLibraryPageGetOutputVisibility {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ToolLibraryPageGetOutputVisibility, v)
+	}
+	*j = ToolLibraryPageGetOutputVisibility(v)
+	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -1309,6 +1466,9 @@ func (j *ToolLibraryPageGetOutput) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["child_pages"]; raw != nil && !ok {
 		return fmt.Errorf("field child_pages in ToolLibraryPageGetOutput: required")
 	}
+	if _, ok := raw["content"]; raw != nil && !ok {
+		return fmt.Errorf("field content in ToolLibraryPageGetOutput: required")
+	}
 	if _, ok := raw["id"]; raw != nil && !ok {
 		return fmt.Errorf("field id in ToolLibraryPageGetOutput: required")
 	}
@@ -1321,6 +1481,9 @@ func (j *ToolLibraryPageGetOutput) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["tags"]; raw != nil && !ok {
 		return fmt.Errorf("field tags in ToolLibraryPageGetOutput: required")
 	}
+	if _, ok := raw["visibility"]; raw != nil && !ok {
+		return fmt.Errorf("field visibility in ToolLibraryPageGetOutput: required")
+	}
 	type Plain ToolLibraryPageGetOutput
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
@@ -1330,7 +1493,7 @@ func (j *ToolLibraryPageGetOutput) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-// Get detailed information about a specific library page by its slug.
+// Retrieve a library page with its content and workflow visibility by ID.
 type ToolLibraryPageGetYaml struct {
 	// Input corresponds to the JSON schema field "input".
 	Input ToolLibraryPageGetInput `json:"input" yaml:"input" mapstructure:"input"`
@@ -1360,8 +1523,7 @@ func (j *ToolLibraryPageGetYaml) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-// Get the full tree structure of pages in the library. Returns a hierarchical view
-// of all wiki pages showing their parent-child relationships.
+// List library pages by hierarchy and workflow visibility.
 type ToolLibraryPageListYaml struct {
 	// Input corresponds to the JSON schema field "input".
 	Input ToolLibraryPageTreeInput `json:"input" yaml:"input" mapstructure:"input"`
@@ -1416,7 +1578,7 @@ func (j *ToolLibraryPagePropertiesUpdateInput) UnmarshalJSON(value []byte) error
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolLibraryPagePropertiesUpdateInput(plain)
@@ -1496,7 +1658,7 @@ func (j *ToolLibraryPagePropertySchemaGetInput) UnmarshalJSON(value []byte) erro
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolLibraryPagePropertySchemaGetInput(plain)
@@ -1508,7 +1670,7 @@ type ToolLibraryPagePropertySchemaGetOutput struct {
 	Fields []PropertySchemaField `json:"fields" yaml:"fields" mapstructure:"fields"`
 
 	// Whether this page has a property schema defined for its children
-	HasSchema *bool `json:"has_schema,omitempty,omitzero" yaml:"has_schema,omitempty" mapstructure:"has_schema,omitempty"`
+	HasSchema *bool `json:"has_schema,omitempty" yaml:"has_schema,omitempty" mapstructure:"has_schema,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -1586,7 +1748,7 @@ func (j *ToolLibraryPagePropertySchemaUpdateInput) UnmarshalJSON(value []byte) e
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolLibraryPagePropertySchemaUpdateInput(plain)
@@ -1652,7 +1814,42 @@ func (j *ToolLibraryPagePropertySchemaUpdateYaml) UnmarshalJSON(value []byte) er
 type ToolLibraryPageTreeInput struct {
 	// Maximum depth to traverse (-1 for unlimited, 0 for root only, 1 for root +
 	// children, etc.)
-	Depth *int `json:"depth,omitempty,omitzero" yaml:"depth,omitempty" mapstructure:"depth,omitempty"`
+	Depth *int `json:"depth,omitempty" yaml:"depth,omitempty" mapstructure:"depth,omitempty"`
+
+	// Limit pages to one workflow visibility.
+	Visibility *ToolLibraryPageTreeInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+}
+
+type ToolLibraryPageTreeInputVisibility string
+
+const ToolLibraryPageTreeInputVisibilityDraft ToolLibraryPageTreeInputVisibility = "draft"
+const ToolLibraryPageTreeInputVisibilityPublished ToolLibraryPageTreeInputVisibility = "published"
+const ToolLibraryPageTreeInputVisibilityReview ToolLibraryPageTreeInputVisibility = "review"
+
+var enumValues_ToolLibraryPageTreeInputVisibility = []interface{}{
+	"draft",
+	"review",
+	"published",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolLibraryPageTreeInputVisibility) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_ToolLibraryPageTreeInputVisibility {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_ToolLibraryPageTreeInputVisibility, v)
+	}
+	*j = ToolLibraryPageTreeInputVisibility(v)
+	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -1670,8 +1867,11 @@ func (j *ToolLibraryPageTreeInput) UnmarshalJSON(value []byte) error {
 }
 
 type ToolLibraryPageTreeOutput struct {
-	// List of pages in tree structure
+	// Pages in hierarchical order for selecting a page to inspect.
 	Pages []LibraryPageTreeNode `json:"pages" yaml:"pages" mapstructure:"pages"`
+
+	// Number of pages returned.
+	Results int `json:"results" yaml:"results" mapstructure:"results"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -1682,6 +1882,9 @@ func (j *ToolLibraryPageTreeOutput) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["pages"]; raw != nil && !ok {
 		return fmt.Errorf("field pages in ToolLibraryPageTreeOutput: required")
+	}
+	if _, ok := raw["results"]; raw != nil && !ok {
+		return fmt.Errorf("field results in ToolLibraryPageTreeOutput: required")
 	}
 	type Plain ToolLibraryPageTreeOutput
 	var plain Plain
@@ -1694,28 +1897,28 @@ func (j *ToolLibraryPageTreeOutput) UnmarshalJSON(value []byte) error {
 
 type ToolLibraryPageUpdateInput struct {
 	// The new content of the page in HTML format
-	Content *string `json:"content,omitempty,omitzero" yaml:"content,omitempty" mapstructure:"content,omitempty"`
+	Content *string `json:"content,omitempty" yaml:"content,omitempty" mapstructure:"content,omitempty"`
 
 	// The unique identifier of the page to update
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
 
 	// The new name/title of the page
-	Name *string `json:"name,omitempty,omitzero" yaml:"name,omitempty" mapstructure:"name,omitempty"`
+	Name *string `json:"name,omitempty" yaml:"name,omitempty" mapstructure:"name,omitempty"`
 
 	// New parent page slug. Provide to move the page to a different parent.
-	Parent *string `json:"parent,omitempty,omitzero" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
+	Parent *string `json:"parent,omitempty" yaml:"parent,omitempty" mapstructure:"parent,omitempty"`
 
 	// The new URL slug for the page
-	Slug *string `json:"slug,omitempty,omitzero" yaml:"slug,omitempty" mapstructure:"slug,omitempty"`
+	Slug *string `json:"slug,omitempty" yaml:"slug,omitempty" mapstructure:"slug,omitempty"`
 
 	// New tags to categorise this page
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// New external URL reference
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// New visibility of the page
-	Visibility *ToolLibraryPageUpdateInputVisibility `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *ToolLibraryPageUpdateInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 type ToolLibraryPageUpdateInputVisibility string
@@ -1762,13 +1965,13 @@ func (j *ToolLibraryPageUpdateInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
-	if plain.Name != nil && utf8.RuneCountInString(string(*plain.Name)) < 1 {
+	if plain.Name != nil && len(*plain.Name) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
 	}
-	if plain.Slug != nil && utf8.RuneCountInString(string(*plain.Slug)) < 1 {
+	if plain.Slug != nil && len(*plain.Slug) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "slug", 1)
 	}
 	*j = ToolLibraryPageUpdateInput(plain)
@@ -1848,15 +2051,13 @@ func (j *ToolLibraryPageUpdateYaml) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type ToolLibraryRequestPageInput map[string]interface{}
-
 type ToolLibraryRequestPageOutput struct {
 	// Absolute frontend URL that opens the selected Library page in a browser. Prefer
 	// this in Markdown links when presenting the page to users.
-	BrowserUrl *string `json:"browser_url,omitempty,omitzero" yaml:"browser_url,omitempty" mapstructure:"browser_url,omitempty"`
+	BrowserUrl *string `json:"browser_url,omitempty" yaml:"browser_url,omitempty" mapstructure:"browser_url,omitempty"`
 
 	// Brief description of the selected Library page.
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// Unique identifier for the selected Library page.
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -1897,7 +2098,7 @@ func (j *ToolLibraryRequestPageOutput) UnmarshalJSON(value []byte) error {
 // page.
 type ToolLibraryRequestPageYaml struct {
 	// Input corresponds to the JSON schema field "input".
-	Input ToolLibraryRequestPageInput `json:"input" yaml:"input" mapstructure:"input"`
+	Input map[string]interface{} `json:"input" yaml:"input" mapstructure:"input"`
 
 	// Output corresponds to the JSON schema field "output".
 	Output ToolLibraryRequestPageOutput `json:"output" yaml:"output" mapstructure:"output"`
@@ -1945,7 +2146,7 @@ func (j *ToolLibrarySearchPagesInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolLibrarySearchPagesInput(plain)
@@ -2036,13 +2237,13 @@ func (j *ToolLinkCreateInput) UnmarshalJSON(value []byte) error {
 
 type ToolLinkCreateOutput struct {
 	// Description extracted from OpenGraph metadata
-	OpengraphDescription *string `json:"opengraph_description,omitempty,omitzero" yaml:"opengraph_description,omitempty" mapstructure:"opengraph_description,omitempty"`
+	OpengraphDescription *string `json:"opengraph_description,omitempty" yaml:"opengraph_description,omitempty" mapstructure:"opengraph_description,omitempty"`
 
 	// Title extracted from OpenGraph metadata
-	OpengraphTitle *string `json:"opengraph_title,omitempty,omitzero" yaml:"opengraph_title,omitempty" mapstructure:"opengraph_title,omitempty"`
+	OpengraphTitle *string `json:"opengraph_title,omitempty" yaml:"opengraph_title,omitempty" mapstructure:"opengraph_title,omitempty"`
 
 	// Plain text content extracted from the page
-	PlainText *string `json:"plain_text,omitempty,omitzero" yaml:"plain_text,omitempty" mapstructure:"plain_text,omitempty"`
+	PlainText *string `json:"plain_text,omitempty" yaml:"plain_text,omitempty" mapstructure:"plain_text,omitempty"`
 
 	// Unique identifier for the link
 	Slug string `json:"slug" yaml:"slug" mapstructure:"slug"`
@@ -2106,7 +2307,7 @@ func (j *ToolLinkCreateYaml) UnmarshalJSON(value []byte) error {
 
 type ToolMemberSearchInput struct {
 	// Maximum number of results to return (default 10, max 100)
-	MaxResults *int `json:"max_results,omitempty,omitzero" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
 
 	// Plain text keyword search string matching name or handle. Boolean operators
 	// like OR, AND, and NOT, quoted phrases, and other special query syntax are not
@@ -2134,7 +2335,7 @@ func (j *ToolMemberSearchInput) UnmarshalJSON(value []byte) error {
 	if plain.MaxResults != nil && 1 > *plain.MaxResults {
 		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolMemberSearchInput(plain)
@@ -2202,14 +2403,14 @@ func (j *ToolMemberSearchYaml) UnmarshalJSON(value []byte) error {
 
 type ToolPostSearchInput struct {
 	// Filter by author handles (usernames). Do not use '@' prefix.
-	Authors []string `json:"authors,omitempty,omitzero" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
+	Authors []string `json:"authors,omitempty" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
 
 	// Filter by category names (applies to threads). Category names are
 	// case-insensitive.
-	Categories []string `json:"categories,omitempty,omitzero" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
+	Categories []string `json:"categories,omitempty" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
 
 	// Maximum number of results to return (default 10, max 100)
-	MaxResults *int `json:"max_results,omitempty,omitzero" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
 
 	// Plain text keyword search string. Boolean operators like OR, AND, and NOT,
 	// quoted phrases, and other special query syntax are not supported. Use simple
@@ -2217,7 +2418,7 @@ type ToolPostSearchInput struct {
 	Query string `json:"query" yaml:"query" mapstructure:"query"`
 
 	// Filter by tag names. Tags are case-sensitive.
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -2240,7 +2441,7 @@ func (j *ToolPostSearchInput) UnmarshalJSON(value []byte) error {
 	if plain.MaxResults != nil && 1 > *plain.MaxResults {
 		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolPostSearchInput(plain)
@@ -2308,10 +2509,10 @@ func (j *ToolPostSearchYaml) UnmarshalJSON(value []byte) error {
 
 type ToolReplySearchInput struct {
 	// Filter by author handles (usernames). Do not use '@' prefix.
-	Authors []string `json:"authors,omitempty,omitzero" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
+	Authors []string `json:"authors,omitempty" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
 
 	// Maximum number of results to return (default 10, max 100)
-	MaxResults *int `json:"max_results,omitempty,omitzero" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
 
 	// Plain text keyword search string. Boolean operators like OR, AND, and NOT,
 	// quoted phrases, and other special query syntax are not supported. Use simple
@@ -2319,7 +2520,7 @@ type ToolReplySearchInput struct {
 	Query string `json:"query" yaml:"query" mapstructure:"query"`
 
 	// Filter by tag names. Tags are case-sensitive.
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -2342,7 +2543,7 @@ func (j *ToolReplySearchInput) UnmarshalJSON(value []byte) error {
 	if plain.MaxResults != nil && 1 > *plain.MaxResults {
 		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolReplySearchInput(plain)
@@ -2414,7 +2615,7 @@ type ToolRobotCreateInput struct {
 
 	// The language model ID in provider/model_name format. If omitted, the system
 	// will use a default model configured for Robots.
-	Model *string `json:"model,omitempty,omitzero" yaml:"model,omitempty" mapstructure:"model,omitempty"`
+	Model *string `json:"model,omitempty" yaml:"model,omitempty" mapstructure:"model,omitempty"`
 
 	// The name of the Robot - should be descriptive and help identify its purpose
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
@@ -2424,8 +2625,12 @@ type ToolRobotCreateInput struct {
 	// Robot's behavior.
 	Playbook string `json:"playbook" yaml:"playbook" mapstructure:"playbook"`
 
-	// List of tool names that the Robot can use.
-	Tools []string `json:"tools,omitempty,omitzero" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+	// Individual tool names that the Robot can use. Tools already provided by an
+	// assigned Toolset are removed.
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+
+	// List of reusable Toolset IDs that the Robot can use.
+	Toolsets []string `json:"toolsets,omitempty" yaml:"toolsets,omitempty" mapstructure:"toolsets,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -2448,13 +2653,13 @@ func (j *ToolRobotCreateInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if plain.Model != nil && utf8.RuneCountInString(string(*plain.Model)) < 1 {
+	if plain.Model != nil && len(*plain.Model) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "model", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Name)) < 1 {
+	if len(plain.Name) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Playbook)) < 1 {
+	if len(plain.Playbook) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "playbook", 1)
 	}
 	*j = ToolRobotCreateInput(plain)
@@ -2492,7 +2697,7 @@ func (j *ToolRobotCreateOutput) UnmarshalJSON(value []byte) error {
 
 // Create a new Robot (agent) with a specific purpose and behavior. Robots are
 // customizable automations that can help users with specific workflows using
-// tailored tools and instructions.
+// direct tools, reusable Toolsets, and instructions.
 type ToolRobotCreateYaml struct {
 	// Input corresponds to the JSON schema field "input".
 	Input ToolRobotCreateInput `json:"input" yaml:"input" mapstructure:"input"`
@@ -2637,7 +2842,7 @@ func (j *ToolRobotGetInput) UnmarshalJSON(value []byte) error {
 
 type ToolRobotGetOutput struct {
 	// Human-readable description of the Robot's purpose
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// The unique identifier of the Robot
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -2651,8 +2856,11 @@ type ToolRobotGetOutput struct {
 	// The Robot's directive
 	Playbook string `json:"playbook" yaml:"playbook" mapstructure:"playbook"`
 
-	// List of tool names that the Robot can use
+	// List of individual tool names that the Robot can use
 	Tools []string `json:"tools" yaml:"tools" mapstructure:"tools"`
+
+	// List of reusable Toolset IDs that the Robot can use
+	Toolsets []string `json:"toolsets" yaml:"toolsets" mapstructure:"toolsets"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -2675,6 +2883,9 @@ func (j *ToolRobotGetOutput) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["tools"]; raw != nil && !ok {
 		return fmt.Errorf("field tools in ToolRobotGetOutput: required")
+	}
+	if _, ok := raw["toolsets"]; raw != nil && !ok {
+		return fmt.Errorf("field toolsets in ToolRobotGetOutput: required")
 	}
 	type Plain ToolRobotGetOutput
 	var plain Plain
@@ -2718,7 +2929,7 @@ func (j *ToolRobotGetYaml) UnmarshalJSON(value []byte) error {
 
 type ToolRobotListInput struct {
 	// Maximum number of Robots to return (default 20)
-	Limit *int `json:"limit,omitempty,omitzero" yaml:"limit,omitempty" mapstructure:"limit,omitempty"`
+	Limit *int `json:"limit,omitempty" yaml:"limit,omitempty" mapstructure:"limit,omitempty"`
 }
 
 type ToolRobotListOutput struct {
@@ -2781,113 +2992,122 @@ func (j *ToolRobotListYaml) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type ToolRobotSwitchInput struct {
-	// The ID of the Robot (agent) to switch to. Must be a valid XID format (20
-	// character alphanumeric string). Use robot_list to see available Robot IDs.
-	RobotId string `json:"robot_id" yaml:"robot_id" mapstructure:"robot_id"`
+type ToolRobotSearchInput struct {
+	// MaxResults corresponds to the JSON schema field "max_results".
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+
+	// The task or capability a specialised Robot should handle.
+	Query string `json:"query" yaml:"query" mapstructure:"query"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *ToolRobotSwitchInput) UnmarshalJSON(value []byte) error {
+func (j *ToolRobotSearchInput) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["robot_id"]; raw != nil && !ok {
-		return fmt.Errorf("field robot_id in ToolRobotSwitchInput: required")
+	if _, ok := raw["query"]; raw != nil && !ok {
+		return fmt.Errorf("field query in ToolRobotSearchInput: required")
 	}
-	type Plain ToolRobotSwitchInput
+	type Plain ToolRobotSearchInput
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if matched, _ := regexp.MatchString(`^[0-9a-v]{20}$`, string(plain.RobotId)); !matched {
-		return fmt.Errorf("field %s pattern match: must match %s", "RobotId", `^[0-9a-v]{20}$`)
+	if plain.MaxResults != nil && 20 < *plain.MaxResults {
+		return fmt.Errorf("field %s: must be <= %v", "max_results", 20)
 	}
-	*j = ToolRobotSwitchInput(plain)
+	if plain.MaxResults != nil && 1 > *plain.MaxResults {
+		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
+	}
+	if len(plain.Query) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
+	}
+	*j = ToolRobotSearchInput(plain)
 	return nil
 }
 
-type ToolRobotSwitchOutput struct {
-	// The ID of the robot that was switched to
-	RobotId string `json:"robot_id" yaml:"robot_id" mapstructure:"robot_id"`
+type ToolRobotSearchOutput struct {
+	// NextAction corresponds to the JSON schema field "next_action".
+	NextAction string `json:"next_action" yaml:"next_action" mapstructure:"next_action"`
 
-	// Whether the agent switch was successful
-	Success bool `json:"success" yaml:"success" mapstructure:"success"`
+	// Robots corresponds to the JSON schema field "robots".
+	Robots []RobotSearchResult `json:"robots" yaml:"robots" mapstructure:"robots"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *ToolRobotSwitchOutput) UnmarshalJSON(value []byte) error {
+func (j *ToolRobotSearchOutput) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["robot_id"]; raw != nil && !ok {
-		return fmt.Errorf("field robot_id in ToolRobotSwitchOutput: required")
+	if _, ok := raw["next_action"]; raw != nil && !ok {
+		return fmt.Errorf("field next_action in ToolRobotSearchOutput: required")
 	}
-	if _, ok := raw["success"]; raw != nil && !ok {
-		return fmt.Errorf("field success in ToolRobotSwitchOutput: required")
+	if _, ok := raw["robots"]; raw != nil && !ok {
+		return fmt.Errorf("field robots in ToolRobotSearchOutput: required")
 	}
-	type Plain ToolRobotSwitchOutput
+	type Plain ToolRobotSearchOutput
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	*j = ToolRobotSwitchOutput(plain)
+	*j = ToolRobotSearchOutput(plain)
 	return nil
 }
 
-// Switch the current conversation to a different Robot (agent). Use this when the
-// user wants to talk to a different specialized agent or when a different agent
-// would be better suited to help with the user's request.
-type ToolRobotSwitchYaml struct {
+// Search specialised Robots by capability before delegating a task.
+type ToolRobotSearchYaml struct {
 	// Input corresponds to the JSON schema field "input".
-	Input ToolRobotSwitchInput `json:"input" yaml:"input" mapstructure:"input"`
+	Input ToolRobotSearchInput `json:"input" yaml:"input" mapstructure:"input"`
 
 	// Output corresponds to the JSON schema field "output".
-	Output ToolRobotSwitchOutput `json:"output" yaml:"output" mapstructure:"output"`
+	Output ToolRobotSearchOutput `json:"output" yaml:"output" mapstructure:"output"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *ToolRobotSwitchYaml) UnmarshalJSON(value []byte) error {
+func (j *ToolRobotSearchYaml) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["input"]; raw != nil && !ok {
-		return fmt.Errorf("field input in ToolRobotSwitchYaml: required")
+		return fmt.Errorf("field input in ToolRobotSearchYaml: required")
 	}
 	if _, ok := raw["output"]; raw != nil && !ok {
-		return fmt.Errorf("field output in ToolRobotSwitchYaml: required")
+		return fmt.Errorf("field output in ToolRobotSearchYaml: required")
 	}
-	type Plain ToolRobotSwitchYaml
+	type Plain ToolRobotSearchYaml
 	var plain Plain
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	*j = ToolRobotSwitchYaml(plain)
+	*j = ToolRobotSearchYaml(plain)
 	return nil
 }
 
 type ToolRobotUpdateInput struct {
 	// The new description for the Robot
-	Description *string `json:"description,omitempty,omitzero" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// The unique identifier of the Robot to update. Must be a valid XID format (20
 	// character alphanumeric string).
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
 
 	// The new language model ID in provider/model_name format.
-	Model *string `json:"model,omitempty,omitzero" yaml:"model,omitempty" mapstructure:"model,omitempty"`
+	Model *string `json:"model,omitempty" yaml:"model,omitempty" mapstructure:"model,omitempty"`
 
 	// The new name for the Robot
-	Name *string `json:"name,omitempty,omitzero" yaml:"name,omitempty" mapstructure:"name,omitempty"`
+	Name *string `json:"name,omitempty" yaml:"name,omitempty" mapstructure:"name,omitempty"`
 
 	// The new directive/system prompt for the Robot
-	Playbook *string `json:"playbook,omitempty,omitzero" yaml:"playbook,omitempty" mapstructure:"playbook,omitempty"`
+	Playbook *string `json:"playbook,omitempty" yaml:"playbook,omitempty" mapstructure:"playbook,omitempty"`
 
-	// The new list of tool names that the Robot can use.
-	Tools []string `json:"tools,omitempty,omitzero" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+	// The new list of individual tool names that the Robot can use.
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+
+	// The new list of reusable Toolset IDs that the Robot can use.
+	Toolsets []string `json:"toolsets,omitempty" yaml:"toolsets,omitempty" mapstructure:"toolsets,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -2907,13 +3127,13 @@ func (j *ToolRobotUpdateInput) UnmarshalJSON(value []byte) error {
 	if matched, _ := regexp.MatchString(`^[0-9a-v]{20}$`, string(plain.Id)); !matched {
 		return fmt.Errorf("field %s pattern match: must match %s", "Id", `^[0-9a-v]{20}$`)
 	}
-	if plain.Model != nil && utf8.RuneCountInString(string(*plain.Model)) < 1 {
+	if plain.Model != nil && len(*plain.Model) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "model", 1)
 	}
-	if plain.Name != nil && utf8.RuneCountInString(string(*plain.Name)) < 1 {
+	if plain.Name != nil && len(*plain.Name) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
 	}
-	if plain.Playbook != nil && utf8.RuneCountInString(string(*plain.Playbook)) < 1 {
+	if plain.Playbook != nil && len(*plain.Playbook) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "playbook", 1)
 	}
 	*j = ToolRobotUpdateInput(plain)
@@ -2950,7 +3170,8 @@ func (j *ToolRobotUpdateOutput) UnmarshalJSON(value []byte) error {
 }
 
 // Update a Robot's configuration. You can modify its name, description, playbook
-// (directive), or tools. Only provide the fields you want to change.
+// (directive), direct tools, or Toolsets. Only provide the fields you want to
+// change.
 type ToolRobotUpdateYaml struct {
 	// Input corresponds to the JSON schema field "input".
 	Input ToolRobotUpdateInput `json:"input" yaml:"input" mapstructure:"input"`
@@ -2980,51 +3201,10 @@ func (j *ToolRobotUpdateYaml) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type ToolSystemRobotToolCatalogInput map[string]interface{}
-
-// List of the tools available in the catalog that you can assign to Robots, with
-// their names and descriptions
-type ToolSystemRobotToolCatalogOutput struct {
-	// Tools corresponds to the JSON schema field "tools".
-	Tools []ToolInfo `json:"tools,omitempty,omitzero" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
-}
-
-// Returns a list of tools that may be assigned to a Robot during Robot creation or
-// update. Use this when selecting capabilities assigned to a Robot. This catalog
-// describes Robot capabilities, not this conversation's capabilities.
-type ToolSystemRobotToolCatalogYaml struct {
-	// Input corresponds to the JSON schema field "input".
-	Input ToolSystemRobotToolCatalogInput `json:"input" yaml:"input" mapstructure:"input"`
-
-	// Output corresponds to the JSON schema field "output".
-	Output ToolSystemRobotToolCatalogOutput `json:"output" yaml:"output" mapstructure:"output"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *ToolSystemRobotToolCatalogYaml) UnmarshalJSON(value []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(value, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["input"]; raw != nil && !ok {
-		return fmt.Errorf("field input in ToolSystemRobotToolCatalogYaml: required")
-	}
-	if _, ok := raw["output"]; raw != nil && !ok {
-		return fmt.Errorf("field output in ToolSystemRobotToolCatalogYaml: required")
-	}
-	type Plain ToolSystemRobotToolCatalogYaml
-	var plain Plain
-	if err := json.Unmarshal(value, &plain); err != nil {
-		return err
-	}
-	*j = ToolSystemRobotToolCatalogYaml(plain)
-	return nil
-}
-
 type ToolTagListInput struct {
 	// Optional search query to filter tags by name. If not provided, returns all
 	// tags.
-	Query *string `json:"query,omitempty,omitzero" yaml:"query,omitempty" mapstructure:"query,omitempty"`
+	Query *string `json:"query,omitempty" yaml:"query,omitempty" mapstructure:"query,omitempty"`
 }
 
 type ToolTagListOutput struct {
@@ -3091,16 +3271,16 @@ type ToolThreadCreateInput struct {
 	Category string `json:"category" yaml:"category" mapstructure:"category"`
 
 	// Optional tags for the thread
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// The title of the thread
 	Title string `json:"title" yaml:"title" mapstructure:"title"`
 
 	// Optional URL if this thread is about a specific link
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// Thread visibility (default: published)
-	Visibility *ToolThreadCreateInputVisibility `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *ToolThreadCreateInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 type ToolThreadCreateInputVisibility string
@@ -3153,10 +3333,10 @@ func (j *ToolThreadCreateInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Body)) < 1 {
+	if len(plain.Body) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "body", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Title)) < 1 {
+	if len(plain.Title) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "title", 1)
 	}
 	*j = ToolThreadCreateInput(plain)
@@ -3165,20 +3345,20 @@ func (j *ToolThreadCreateInput) UnmarshalJSON(value []byte) error {
 
 type ToolThreadCreateOutput struct {
 	// Author handle
-	Author *string `json:"author,omitempty,omitzero" yaml:"author,omitempty" mapstructure:"author,omitempty"`
+	Author *string `json:"author,omitempty" yaml:"author,omitempty" mapstructure:"author,omitempty"`
 
 	// Browser URL for this resource. Always present this as a Markdown link when
 	// showing results to the user.
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Category name
-	Category *string `json:"category,omitempty,omitzero" yaml:"category,omitempty" mapstructure:"category,omitempty"`
+	Category *string `json:"category,omitempty" yaml:"category,omitempty" mapstructure:"category,omitempty"`
 
 	// Thread content as plain text
-	Content *string `json:"content,omitempty,omitzero" yaml:"content,omitempty" mapstructure:"content,omitempty"`
+	Content *string `json:"content,omitempty" yaml:"content,omitempty" mapstructure:"content,omitempty"`
 
 	// Creation timestamp
-	CreatedAt *string `json:"created_at,omitempty,omitzero" yaml:"created_at,omitempty" mapstructure:"created_at,omitempty"`
+	CreatedAt *string `json:"created_at,omitempty" yaml:"created_at,omitempty" mapstructure:"created_at,omitempty"`
 
 	// Unique identifier for the created thread
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -3187,16 +3367,16 @@ type ToolThreadCreateOutput struct {
 	Slug string `json:"slug" yaml:"slug" mapstructure:"slug"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// The thread title
 	Title string `json:"title" yaml:"title" mapstructure:"title"`
 
 	// Associated URL if present
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// Thread visibility
-	Visibility *string `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *string `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -3262,7 +3442,7 @@ type ToolThreadGetInput struct {
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
 
 	// Page number for replies (default: 1)
-	Page *int `json:"page,omitempty,omitzero" yaml:"page,omitempty" mapstructure:"page,omitempty"`
+	Page *int `json:"page,omitempty" yaml:"page,omitempty" mapstructure:"page,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -3279,7 +3459,7 @@ func (j *ToolThreadGetInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	if plain.Page != nil && 1 > *plain.Page {
@@ -3319,7 +3499,7 @@ type ToolThreadGetOutput struct {
 	Title string `json:"title" yaml:"title" mapstructure:"title"`
 
 	// Associated URL if present
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// Visibility corresponds to the JSON schema field "visibility".
 	Visibility string `json:"visibility" yaml:"visibility" mapstructure:"visibility"`
@@ -3403,13 +3583,13 @@ func (j *ToolThreadGetYaml) UnmarshalJSON(value []byte) error {
 
 type ToolThreadListInput struct {
 	// Page number (default: 1)
-	Page *int `json:"page,omitempty,omitzero" yaml:"page,omitempty" mapstructure:"page,omitempty"`
+	Page *int `json:"page,omitempty" yaml:"page,omitempty" mapstructure:"page,omitempty"`
 
 	// Search query to filter threads
-	Query *string `json:"query,omitempty,omitzero" yaml:"query,omitempty" mapstructure:"query,omitempty"`
+	Query *string `json:"query,omitempty" yaml:"query,omitempty" mapstructure:"query,omitempty"`
 
 	// Filter by visibility
-	Visibility *ToolThreadListInputVisibility `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *ToolThreadListInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 type ToolThreadListInputVisibility string
@@ -3461,7 +3641,7 @@ type ToolThreadListOutput struct {
 	CurrentPage int `json:"current_page" yaml:"current_page" mapstructure:"current_page"`
 
 	// Next page number if available
-	NextPage *int `json:"next_page,omitempty,omitzero" yaml:"next_page,omitempty" mapstructure:"next_page,omitempty"`
+	NextPage *int `json:"next_page,omitempty" yaml:"next_page,omitempty" mapstructure:"next_page,omitempty"`
 
 	// Threads corresponds to the JSON schema field "threads".
 	Threads []ThreadSummary `json:"threads" yaml:"threads" mapstructure:"threads"`
@@ -3555,10 +3735,10 @@ func (j *ToolThreadReplyInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(string(plain.Body)) < 1 {
+	if len(plain.Body) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "body", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolThreadReplyInput(plain)
@@ -3651,13 +3831,13 @@ func (j *ToolThreadReplyYaml) UnmarshalJSON(value []byte) error {
 
 type ToolThreadSearchInput struct {
 	// Filter by author handles (usernames). Do not use '@' prefix.
-	Authors []string `json:"authors,omitempty,omitzero" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
+	Authors []string `json:"authors,omitempty" yaml:"authors,omitempty" mapstructure:"authors,omitempty"`
 
 	// Filter by category names. Category names are case-insensitive.
-	Categories []string `json:"categories,omitempty,omitzero" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
+	Categories []string `json:"categories,omitempty" yaml:"categories,omitempty" mapstructure:"categories,omitempty"`
 
 	// Maximum number of results to return (default 10, max 100)
-	MaxResults *int `json:"max_results,omitempty,omitzero" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
 
 	// Plain text keyword search string. Boolean operators like OR, AND, and NOT,
 	// quoted phrases, and other special query syntax are not supported. Use simple
@@ -3665,7 +3845,7 @@ type ToolThreadSearchInput struct {
 	Query string `json:"query" yaml:"query" mapstructure:"query"`
 
 	// Filter by tag names. Tags are case-sensitive.
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -3688,7 +3868,7 @@ func (j *ToolThreadSearchInput) UnmarshalJSON(value []byte) error {
 	if plain.MaxResults != nil && 1 > *plain.MaxResults {
 		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Query)) < 1 {
+	if len(plain.Query) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
 	}
 	*j = ToolThreadSearchInput(plain)
@@ -3756,19 +3936,19 @@ func (j *ToolThreadSearchYaml) UnmarshalJSON(value []byte) error {
 
 type ToolThreadUpdateInput struct {
 	// New content for the thread in HTML format
-	Body *string `json:"body,omitempty,omitzero" yaml:"body,omitempty" mapstructure:"body,omitempty"`
+	Body *string `json:"body,omitempty" yaml:"body,omitempty" mapstructure:"body,omitempty"`
 
 	// The unique identifier of the thread to update
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
 
 	// New tags for the thread
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// New title for the thread
-	Title *string `json:"title,omitempty,omitzero" yaml:"title,omitempty" mapstructure:"title,omitempty"`
+	Title *string `json:"title,omitempty" yaml:"title,omitempty" mapstructure:"title,omitempty"`
 
 	// New visibility: published or draft
-	Visibility *ToolThreadUpdateInputVisibility `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *ToolThreadUpdateInputVisibility `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 type ToolThreadUpdateInputVisibility string
@@ -3815,10 +3995,10 @@ func (j *ToolThreadUpdateInput) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
-	if plain.Body != nil && utf8.RuneCountInString(string(*plain.Body)) < 1 {
+	if plain.Body != nil && len(*plain.Body) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "body", 1)
 	}
-	if utf8.RuneCountInString(string(plain.Id)) < 1 {
+	if len(plain.Id) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "id", 1)
 	}
 	*j = ToolThreadUpdateInput(plain)
@@ -3827,20 +4007,20 @@ func (j *ToolThreadUpdateInput) UnmarshalJSON(value []byte) error {
 
 type ToolThreadUpdateOutput struct {
 	// Author handle
-	Author *string `json:"author,omitempty,omitzero" yaml:"author,omitempty" mapstructure:"author,omitempty"`
+	Author *string `json:"author,omitempty" yaml:"author,omitempty" mapstructure:"author,omitempty"`
 
 	// Browser URL for this resource. Always present this as a Markdown link when
 	// showing results to the user.
 	BrowserUrl string `json:"browser_url" yaml:"browser_url" mapstructure:"browser_url"`
 
 	// Category name
-	Category *string `json:"category,omitempty,omitzero" yaml:"category,omitempty" mapstructure:"category,omitempty"`
+	Category *string `json:"category,omitempty" yaml:"category,omitempty" mapstructure:"category,omitempty"`
 
 	// Thread content as plain text
-	Content *string `json:"content,omitempty,omitzero" yaml:"content,omitempty" mapstructure:"content,omitempty"`
+	Content *string `json:"content,omitempty" yaml:"content,omitempty" mapstructure:"content,omitempty"`
 
 	// Creation timestamp
-	CreatedAt *string `json:"created_at,omitempty,omitzero" yaml:"created_at,omitempty" mapstructure:"created_at,omitempty"`
+	CreatedAt *string `json:"created_at,omitempty" yaml:"created_at,omitempty" mapstructure:"created_at,omitempty"`
 
 	// Unique identifier for the thread
 	Id string `json:"id" yaml:"id" mapstructure:"id"`
@@ -3849,16 +4029,16 @@ type ToolThreadUpdateOutput struct {
 	Slug string `json:"slug" yaml:"slug" mapstructure:"slug"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags []string `json:"tags,omitempty,omitzero" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 
 	// The thread title
 	Title string `json:"title" yaml:"title" mapstructure:"title"`
 
 	// Associated URL if present
-	Url *string `json:"url,omitempty,omitzero" yaml:"url,omitempty" mapstructure:"url,omitempty"`
+	Url *string `json:"url,omitempty" yaml:"url,omitempty" mapstructure:"url,omitempty"`
 
 	// Thread visibility
-	Visibility *string `json:"visibility,omitempty,omitzero" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
+	Visibility *string `json:"visibility,omitempty" yaml:"visibility,omitempty" mapstructure:"visibility,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -3915,5 +4095,945 @@ func (j *ToolThreadUpdateYaml) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = ToolThreadUpdateYaml(plain)
+	return nil
+}
+
+type ToolToolGetInput struct {
+	// Stable tool ID returned by tool_search.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolGetInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolGetInput: required")
+	}
+	type Plain ToolToolGetInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolGetInput(plain)
+	return nil
+}
+
+type ToolToolGetOutput struct {
+	// The outcome the tool is designed to achieve and when it should be selected.
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Stable tool identifier accepted by tool_load and Robot configuration tools.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Complete JSON Schema for arguments that must be supplied when calling the tool.
+	InputSchema map[string]interface{} `json:"input_schema" yaml:"input_schema" mapstructure:"input_schema"`
+
+	// Human-readable title for explaining or confirming the selected capability.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// Complete JSON Schema for the tool result when the tool declares one.
+	OutputSchema map[string]interface{} `json:"output_schema,omitempty" yaml:"output_schema,omitempty" mapstructure:"output_schema,omitempty"`
+
+	// Whether a run must pause for human approval before executing this tool.
+	RequiresConfirmation bool `json:"requires_confirmation" yaml:"requires_confirmation" mapstructure:"requires_confirmation"`
+
+	// Whether the conversation must have an active Robot workspace before this tool
+	// can be loaded or used.
+	RequiresWorkspace bool `json:"requires_workspace" yaml:"requires_workspace" mapstructure:"requires_workspace"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolGetOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in ToolToolGetOutput: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolGetOutput: required")
+	}
+	if _, ok := raw["input_schema"]; raw != nil && !ok {
+		return fmt.Errorf("field input_schema in ToolToolGetOutput: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ToolToolGetOutput: required")
+	}
+	if _, ok := raw["requires_confirmation"]; raw != nil && !ok {
+		return fmt.Errorf("field requires_confirmation in ToolToolGetOutput: required")
+	}
+	if _, ok := raw["requires_workspace"]; raw != nil && !ok {
+		return fmt.Errorf("field requires_workspace in ToolToolGetOutput: required")
+	}
+	type Plain ToolToolGetOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolGetOutput(plain)
+	return nil
+}
+
+// Get the full schema and runtime preconditions of one tool after finding its ID
+// with tool_search. This is inspection only; it does not load or activate the
+// tool.
+type ToolToolGetYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolGetInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolGetOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolGetYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolGetYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolGetYaml: required")
+	}
+	type Plain ToolToolGetYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolGetYaml(plain)
+	return nil
+}
+
+type ToolToolLoadInput struct {
+	// Stable tool IDs inspected with tool_get.
+	Tools []string `json:"tools" yaml:"tools" mapstructure:"tools"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolLoadInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["tools"]; raw != nil && !ok {
+		return fmt.Errorf("field tools in ToolToolLoadInput: required")
+	}
+	type Plain ToolToolLoadInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Tools != nil && len(plain.Tools) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "tools", 1)
+	}
+	*j = ToolToolLoadInput(plain)
+	return nil
+}
+
+type ToolToolLoadOutput struct {
+	// Tools activated for subsequent model steps in this conversation.
+	Loaded []RobotToolCatalogueItemYaml `json:"loaded" yaml:"loaded" mapstructure:"loaded"`
+
+	// Recommended continuation now that the selected tools are available.
+	NextAction string `json:"next_action" yaml:"next_action" mapstructure:"next_action"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolLoadOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["loaded"]; raw != nil && !ok {
+		return fmt.Errorf("field loaded in ToolToolLoadOutput: required")
+	}
+	if _, ok := raw["next_action"]; raw != nil && !ok {
+		return fmt.Errorf("field next_action in ToolToolLoadOutput: required")
+	}
+	type Plain ToolToolLoadOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolLoadOutput(plain)
+	return nil
+}
+
+// Activate one or more individual tools for the current Denbot conversation after
+// inspecting their schemas and runtime preconditions with tool_get.
+// Workspace-dependent tools cannot be loaded until the conversation has an active
+// workspace.
+type ToolToolLoadYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolLoadInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolLoadOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolLoadYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolLoadYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolLoadYaml: required")
+	}
+	type Plain ToolToolLoadYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolLoadYaml(plain)
+	return nil
+}
+
+type ToolToolSearchInput struct {
+	// Maximum number of ranked candidates to return; omit to use the default.
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+
+	// Capability, task, or tool name to search for.
+	Query string `json:"query" yaml:"query" mapstructure:"query"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolSearchInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["query"]; raw != nil && !ok {
+		return fmt.Errorf("field query in ToolToolSearchInput: required")
+	}
+	type Plain ToolToolSearchInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.MaxResults != nil && 20 < *plain.MaxResults {
+		return fmt.Errorf("field %s: must be <= %v", "max_results", 20)
+	}
+	if plain.MaxResults != nil && 1 > *plain.MaxResults {
+		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
+	}
+	if len(plain.Query) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
+	}
+	*j = ToolToolSearchInput(plain)
+	return nil
+}
+
+type ToolToolSearchOutput struct {
+	// Recommended next step for inspecting and activating a selected candidate.
+	NextAction string `json:"next_action" yaml:"next_action" mapstructure:"next_action"`
+
+	// Ranked tool candidates with enough context to choose which one to inspect.
+	Tools []RobotToolCatalogueItemYaml `json:"tools" yaml:"tools" mapstructure:"tools"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolSearchOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["next_action"]; raw != nil && !ok {
+		return fmt.Errorf("field next_action in ToolToolSearchOutput: required")
+	}
+	if _, ok := raw["tools"]; raw != nil && !ok {
+		return fmt.Errorf("field tools in ToolToolSearchOutput: required")
+	}
+	type Plain ToolToolSearchOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolSearchOutput(plain)
+	return nil
+}
+
+// Search for individual tools that can perform one narrow task. Use tool_get to
+// inspect a candidate's schema before loading it or assigning it to a Robot.
+type ToolToolSearchYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolSearchInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolSearchOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolSearchYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolSearchYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolSearchYaml: required")
+	}
+	type Plain ToolToolSearchYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolSearchYaml(plain)
+	return nil
+}
+
+type ToolToolsetCreateInput struct {
+	// Description corresponds to the JSON schema field "description".
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Instruction corresponds to the JSON schema field "instruction".
+	Instruction *string `json:"instruction,omitempty" yaml:"instruction,omitempty" mapstructure:"instruction,omitempty"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// Tools corresponds to the JSON schema field "tools".
+	Tools []string `json:"tools" yaml:"tools" mapstructure:"tools"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetCreateInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in ToolToolsetCreateInput: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ToolToolsetCreateInput: required")
+	}
+	if _, ok := raw["tools"]; raw != nil && !ok {
+		return fmt.Errorf("field tools in ToolToolsetCreateInput: required")
+	}
+	type Plain ToolToolsetCreateInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if len(plain.Name) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	*j = ToolToolsetCreateInput(plain)
+	return nil
+}
+
+type ToolToolsetCreateOutput struct {
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetCreateOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetCreateOutput: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ToolToolsetCreateOutput: required")
+	}
+	type Plain ToolToolsetCreateOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetCreateOutput(plain)
+	return nil
+}
+
+// Create a reusable custom Toolset from available tool identifiers and optional
+// specialised prompt guidance.
+type ToolToolsetCreateYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetCreateInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetCreateOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetCreateYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetCreateYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetCreateYaml: required")
+	}
+	type Plain ToolToolsetCreateYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetCreateYaml(plain)
+	return nil
+}
+
+type ToolToolsetDeleteInput struct {
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetDeleteInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetDeleteInput: required")
+	}
+	type Plain ToolToolsetDeleteInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if matched, _ := regexp.MatchString(`^[0-9a-v]{20}$`, string(plain.Id)); !matched {
+		return fmt.Errorf("field %s pattern match: must match %s", "Id", `^[0-9a-v]{20}$`)
+	}
+	*j = ToolToolsetDeleteInput(plain)
+	return nil
+}
+
+type ToolToolsetDeleteOutput struct {
+	// Deleted corresponds to the JSON schema field "deleted".
+	Deleted bool `json:"deleted" yaml:"deleted" mapstructure:"deleted"`
+
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetDeleteOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["deleted"]; raw != nil && !ok {
+		return fmt.Errorf("field deleted in ToolToolsetDeleteOutput: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetDeleteOutput: required")
+	}
+	type Plain ToolToolsetDeleteOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetDeleteOutput(plain)
+	return nil
+}
+
+// Delete an unused authored custom Toolset. Remove it from Robots first.
+type ToolToolsetDeleteYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetDeleteInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetDeleteOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetDeleteYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetDeleteYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetDeleteYaml: required")
+	}
+	type Plain ToolToolsetDeleteYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetDeleteYaml(plain)
+	return nil
+}
+
+type ToolToolsetGetInput struct {
+	// Stable Toolset ID returned by toolset_search.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetGetInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetGetInput: required")
+	}
+	type Plain ToolToolsetGetInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetGetInput(plain)
+	return nil
+}
+
+type ToolToolsetGetOutput struct {
+	// The jobs this Toolset is designed to handle and when the bundle should be
+	// selected.
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
+
+	// Whether the current caller can update or delete this Toolset through management
+	// tools.
+	Editable bool `json:"editable" yaml:"editable" mapstructure:"editable"`
+
+	// Stable Toolset identifier accepted by toolset_load and Robot configuration
+	// tools.
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Specialist guidance injected while this Toolset is active, including workflow
+	// and safety boundaries.
+	Instruction string `json:"instruction" yaml:"instruction" mapstructure:"instruction"`
+
+	// Human-readable name for explaining or confirming the selected capability
+	// bundle.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// Whether the conversation must have an active Robot workspace before this
+	// Toolset can be loaded or used.
+	RequiresWorkspace bool `json:"requires_workspace" yaml:"requires_workspace" mapstructure:"requires_workspace"`
+
+	// Tool IDs activated or assigned together by this Toolset; use tool_get when an
+	// individual schema is needed.
+	Tools []string `json:"tools" yaml:"tools" mapstructure:"tools"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetGetOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["editable"]; raw != nil && !ok {
+		return fmt.Errorf("field editable in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["instruction"]; raw != nil && !ok {
+		return fmt.Errorf("field instruction in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["requires_workspace"]; raw != nil && !ok {
+		return fmt.Errorf("field requires_workspace in ToolToolsetGetOutput: required")
+	}
+	if _, ok := raw["tools"]; raw != nil && !ok {
+		return fmt.Errorf("field tools in ToolToolsetGetOutput: required")
+	}
+	type Plain ToolToolsetGetOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetGetOutput(plain)
+	return nil
+}
+
+// Get a Toolset's complete agent-relevant configuration after finding its ID with
+// toolset_search. Returns its tool IDs, specialist instruction, workspace
+// precondition, and whether this caller may edit it.
+type ToolToolsetGetYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetGetInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetGetOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetGetYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetGetYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetGetYaml: required")
+	}
+	type Plain ToolToolsetGetYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetGetYaml(plain)
+	return nil
+}
+
+type ToolToolsetListOutput struct {
+	// Toolsets corresponds to the JSON schema field "toolsets".
+	Toolsets []RobotToolsetCatalogueItemYaml `json:"toolsets" yaml:"toolsets" mapstructure:"toolsets"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetListOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["toolsets"]; raw != nil && !ok {
+		return fmt.Errorf("field toolsets in ToolToolsetListOutput: required")
+	}
+	type Plain ToolToolsetListOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetListOutput(plain)
+	return nil
+}
+
+// List reusable system, custom, and plugin Toolsets.
+type ToolToolsetListYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input map[string]interface{} `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetListOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetListYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetListYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetListYaml: required")
+	}
+	type Plain ToolToolsetListYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetListYaml(plain)
+	return nil
+}
+
+type ToolToolsetLoadInput struct {
+	// Toolset IDs inspected with toolset_get.
+	Toolsets []string `json:"toolsets" yaml:"toolsets" mapstructure:"toolsets"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetLoadInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["toolsets"]; raw != nil && !ok {
+		return fmt.Errorf("field toolsets in ToolToolsetLoadInput: required")
+	}
+	type Plain ToolToolsetLoadInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.Toolsets != nil && len(plain.Toolsets) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "toolsets", 1)
+	}
+	*j = ToolToolsetLoadInput(plain)
+	return nil
+}
+
+type ToolToolsetLoadOutput struct {
+	// Toolsets activated for subsequent model steps in this conversation.
+	Loaded []RobotToolsetCatalogueItemYaml `json:"loaded" yaml:"loaded" mapstructure:"loaded"`
+
+	// Recommended continuation now that the selected Toolsets and their guidance are
+	// active.
+	NextAction string `json:"next_action" yaml:"next_action" mapstructure:"next_action"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetLoadOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["loaded"]; raw != nil && !ok {
+		return fmt.Errorf("field loaded in ToolToolsetLoadOutput: required")
+	}
+	if _, ok := raw["next_action"]; raw != nil && !ok {
+		return fmt.Errorf("field next_action in ToolToolsetLoadOutput: required")
+	}
+	type Plain ToolToolsetLoadOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetLoadOutput(plain)
+	return nil
+}
+
+// Activate reusable Toolsets for the current Robot conversation after inspecting
+// their contents and runtime preconditions with toolset_get. Workspace-dependent
+// Toolsets cannot be loaded until the conversation has an active workspace.
+type ToolToolsetLoadYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetLoadInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetLoadOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetLoadYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetLoadYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetLoadYaml: required")
+	}
+	type Plain ToolToolsetLoadYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetLoadYaml(plain)
+	return nil
+}
+
+type ToolToolsetSearchInput struct {
+	// Maximum number of ranked candidates to return; omit to use the default.
+	MaxResults *int `json:"max_results,omitempty" yaml:"max_results,omitempty" mapstructure:"max_results,omitempty"`
+
+	// Capability, task, or Toolset name to search for.
+	Query string `json:"query" yaml:"query" mapstructure:"query"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetSearchInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["query"]; raw != nil && !ok {
+		return fmt.Errorf("field query in ToolToolsetSearchInput: required")
+	}
+	type Plain ToolToolsetSearchInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if plain.MaxResults != nil && 20 < *plain.MaxResults {
+		return fmt.Errorf("field %s: must be <= %v", "max_results", 20)
+	}
+	if plain.MaxResults != nil && 1 > *plain.MaxResults {
+		return fmt.Errorf("field %s: must be >= %v", "max_results", 1)
+	}
+	if len(plain.Query) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "query", 1)
+	}
+	*j = ToolToolsetSearchInput(plain)
+	return nil
+}
+
+type ToolToolsetSearchOutput struct {
+	// Recommended next step for inspecting and activating a selected candidate.
+	NextAction string `json:"next_action" yaml:"next_action" mapstructure:"next_action"`
+
+	// Ranked Toolset candidates with enough context to choose which bundle to
+	// inspect.
+	Toolsets []RobotToolsetCatalogueItemYaml `json:"toolsets" yaml:"toolsets" mapstructure:"toolsets"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetSearchOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["next_action"]; raw != nil && !ok {
+		return fmt.Errorf("field next_action in ToolToolsetSearchOutput: required")
+	}
+	if _, ok := raw["toolsets"]; raw != nil && !ok {
+		return fmt.Errorf("field toolsets in ToolToolsetSearchOutput: required")
+	}
+	type Plain ToolToolsetSearchOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetSearchOutput(plain)
+	return nil
+}
+
+// Search reusable Toolsets for a coherent bundle of capabilities and specialist
+// guidance. Use toolset_get to inspect a candidate before loading it or assigning
+// it to a Robot.
+type ToolToolsetSearchYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetSearchInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetSearchOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetSearchYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetSearchYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetSearchYaml: required")
+	}
+	type Plain ToolToolsetSearchYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetSearchYaml(plain)
+	return nil
+}
+
+type ToolToolsetUpdateInput struct {
+	// Description corresponds to the JSON schema field "description".
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Instruction corresponds to the JSON schema field "instruction".
+	Instruction *string `json:"instruction,omitempty" yaml:"instruction,omitempty" mapstructure:"instruction,omitempty"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name *string `json:"name,omitempty" yaml:"name,omitempty" mapstructure:"name,omitempty"`
+
+	// Tools corresponds to the JSON schema field "tools".
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetUpdateInput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetUpdateInput: required")
+	}
+	type Plain ToolToolsetUpdateInput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	if matched, _ := regexp.MatchString(`^[0-9a-v]{20}$`, string(plain.Id)); !matched {
+		return fmt.Errorf("field %s pattern match: must match %s", "Id", `^[0-9a-v]{20}$`)
+	}
+	if plain.Name != nil && len(*plain.Name) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "name", 1)
+	}
+	*j = ToolToolsetUpdateInput(plain)
+	return nil
+}
+
+type ToolToolsetUpdateOutput struct {
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// Name corresponds to the JSON schema field "name".
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetUpdateOutput) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in ToolToolsetUpdateOutput: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in ToolToolsetUpdateOutput: required")
+	}
+	type Plain ToolToolsetUpdateOutput
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetUpdateOutput(plain)
+	return nil
+}
+
+// Update an authored custom Toolset. System and plugin Toolsets are read-only.
+type ToolToolsetUpdateYaml struct {
+	// Input corresponds to the JSON schema field "input".
+	Input ToolToolsetUpdateInput `json:"input" yaml:"input" mapstructure:"input"`
+
+	// Output corresponds to the JSON schema field "output".
+	Output ToolToolsetUpdateOutput `json:"output" yaml:"output" mapstructure:"output"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *ToolToolsetUpdateYaml) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["input"]; raw != nil && !ok {
+		return fmt.Errorf("field input in ToolToolsetUpdateYaml: required")
+	}
+	if _, ok := raw["output"]; raw != nil && !ok {
+		return fmt.Errorf("field output in ToolToolsetUpdateYaml: required")
+	}
+	type Plain ToolToolsetUpdateYaml
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = ToolToolsetUpdateYaml(plain)
 	return nil
 }

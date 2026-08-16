@@ -26,10 +26,22 @@ type RobotSession struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// The name of the session (generated from the message history shortly after the session begins.)
 	Name string `json:"name,omitempty"`
-	// UserID (account ID) from ADK Session
+	// The account that created this session.
 	AccountID xid.ID `json:"account_id,omitempty"`
 	// Session state from ADK
 	State map[string]interface{} `json:"state,omitempty"`
+	// Serialises Robot turns for this shared session.
+	ExecutionStatus robotsession.ExecutionStatus `json:"execution_status,omitempty"`
+	// Turn currently holding or blocking this session.
+	ActiveTurnID *xid.ID `json:"active_turn_id,omitempty"`
+	// Anonymous capability held by the active execution.
+	LeaseToken *string `json:"lease_token,omitempty"`
+	// Monotonic fencing generation for session executions.
+	LeaseGeneration uint64 `json:"lease_generation,omitempty"`
+	// Allocates ordered events within this session.
+	NextEventSequence uint64 `json:"next_event_sequence,omitempty"`
+	// Expiry used to recover a session after an interrupted execution.
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the RobotSessionQuery when eager-loading is set.
 	Edges        RobotSessionEdges `json:"edges"`
@@ -38,33 +50,55 @@ type RobotSession struct {
 
 // RobotSessionEdges holds the relations/edges for other nodes in the graph.
 type RobotSessionEdges struct {
-	// User holds the value of the user edge.
-	User *Account `json:"user,omitempty"`
+	// Creator holds the value of the creator edge.
+	Creator *Account `json:"creator,omitempty"`
+	// Views holds the value of the views edge.
+	Views []*RobotSessionView `json:"views,omitempty"`
 	// Messages holds the value of the messages edge.
 	Messages []*RobotSessionMessage `json:"messages,omitempty"`
+	// Turns holds the value of the turns edge.
+	Turns []*RobotSessionTurn `json:"turns,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [4]bool
 }
 
-// UserOrErr returns the User value or an error if the edge
+// CreatorOrErr returns the Creator value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e RobotSessionEdges) UserOrErr() (*Account, error) {
-	if e.User != nil {
-		return e.User, nil
+func (e RobotSessionEdges) CreatorOrErr() (*Account, error) {
+	if e.Creator != nil {
+		return e.Creator, nil
 	} else if e.loadedTypes[0] {
 		return nil, &NotFoundError{label: account.Label}
 	}
-	return nil, &NotLoadedError{edge: "user"}
+	return nil, &NotLoadedError{edge: "creator"}
+}
+
+// ViewsOrErr returns the Views value or an error if the edge
+// was not loaded in eager-loading.
+func (e RobotSessionEdges) ViewsOrErr() ([]*RobotSessionView, error) {
+	if e.loadedTypes[1] {
+		return e.Views, nil
+	}
+	return nil, &NotLoadedError{edge: "views"}
 }
 
 // MessagesOrErr returns the Messages value or an error if the edge
 // was not loaded in eager-loading.
 func (e RobotSessionEdges) MessagesOrErr() ([]*RobotSessionMessage, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Messages, nil
 	}
 	return nil, &NotLoadedError{edge: "messages"}
+}
+
+// TurnsOrErr returns the Turns value or an error if the edge
+// was not loaded in eager-loading.
+func (e RobotSessionEdges) TurnsOrErr() ([]*RobotSessionTurn, error) {
+	if e.loadedTypes[3] {
+		return e.Turns, nil
+	}
+	return nil, &NotLoadedError{edge: "turns"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -72,11 +106,15 @@ func (*RobotSession) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case robotsession.FieldActiveTurnID:
+			values[i] = &sql.NullScanner{S: new(xid.ID)}
 		case robotsession.FieldState:
 			values[i] = new([]byte)
-		case robotsession.FieldName:
+		case robotsession.FieldLeaseGeneration, robotsession.FieldNextEventSequence:
+			values[i] = new(sql.NullInt64)
+		case robotsession.FieldName, robotsession.FieldExecutionStatus, robotsession.FieldLeaseToken:
 			values[i] = new(sql.NullString)
-		case robotsession.FieldCreatedAt, robotsession.FieldUpdatedAt:
+		case robotsession.FieldCreatedAt, robotsession.FieldUpdatedAt, robotsession.FieldLeaseExpiresAt:
 			values[i] = new(sql.NullTime)
 		case robotsession.FieldID, robotsession.FieldAccountID:
 			values[i] = new(xid.ID)
@@ -133,6 +171,45 @@ func (_m *RobotSession) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field state: %w", err)
 				}
 			}
+		case robotsession.FieldExecutionStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field execution_status", values[i])
+			} else if value.Valid {
+				_m.ExecutionStatus = robotsession.ExecutionStatus(value.String)
+			}
+		case robotsession.FieldActiveTurnID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field active_turn_id", values[i])
+			} else if value.Valid {
+				_m.ActiveTurnID = new(xid.ID)
+				*_m.ActiveTurnID = *value.S.(*xid.ID)
+			}
+		case robotsession.FieldLeaseToken:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field lease_token", values[i])
+			} else if value.Valid {
+				_m.LeaseToken = new(string)
+				*_m.LeaseToken = value.String
+			}
+		case robotsession.FieldLeaseGeneration:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field lease_generation", values[i])
+			} else if value.Valid {
+				_m.LeaseGeneration = uint64(value.Int64)
+			}
+		case robotsession.FieldNextEventSequence:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field next_event_sequence", values[i])
+			} else if value.Valid {
+				_m.NextEventSequence = uint64(value.Int64)
+			}
+		case robotsession.FieldLeaseExpiresAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field lease_expires_at", values[i])
+			} else if value.Valid {
+				_m.LeaseExpiresAt = new(time.Time)
+				*_m.LeaseExpiresAt = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -146,14 +223,24 @@ func (_m *RobotSession) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
-// QueryUser queries the "user" edge of the RobotSession entity.
-func (_m *RobotSession) QueryUser() *AccountQuery {
-	return NewRobotSessionClient(_m.config).QueryUser(_m)
+// QueryCreator queries the "creator" edge of the RobotSession entity.
+func (_m *RobotSession) QueryCreator() *AccountQuery {
+	return NewRobotSessionClient(_m.config).QueryCreator(_m)
+}
+
+// QueryViews queries the "views" edge of the RobotSession entity.
+func (_m *RobotSession) QueryViews() *RobotSessionViewQuery {
+	return NewRobotSessionClient(_m.config).QueryViews(_m)
 }
 
 // QueryMessages queries the "messages" edge of the RobotSession entity.
 func (_m *RobotSession) QueryMessages() *RobotSessionMessageQuery {
 	return NewRobotSessionClient(_m.config).QueryMessages(_m)
+}
+
+// QueryTurns queries the "turns" edge of the RobotSession entity.
+func (_m *RobotSession) QueryTurns() *RobotSessionTurnQuery {
+	return NewRobotSessionClient(_m.config).QueryTurns(_m)
 }
 
 // Update returns a builder for updating this RobotSession.
@@ -193,6 +280,30 @@ func (_m *RobotSession) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("state=")
 	builder.WriteString(fmt.Sprintf("%v", _m.State))
+	builder.WriteString(", ")
+	builder.WriteString("execution_status=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ExecutionStatus))
+	builder.WriteString(", ")
+	if v := _m.ActiveTurnID; v != nil {
+		builder.WriteString("active_turn_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.LeaseToken; v != nil {
+		builder.WriteString("lease_token=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("lease_generation=")
+	builder.WriteString(fmt.Sprintf("%v", _m.LeaseGeneration))
+	builder.WriteString(", ")
+	builder.WriteString("next_event_sequence=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NextEventSequence))
+	builder.WriteString(", ")
+	if v := _m.LeaseExpiresAt; v != nil {
+		builder.WriteString("lease_expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

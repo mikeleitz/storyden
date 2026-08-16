@@ -1,7 +1,6 @@
 package crud_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -22,7 +21,6 @@ import (
 	"github.com/Southclaws/storyden/app/resources/rbac"
 	"github.com/Southclaws/storyden/app/resources/seed"
 	"github.com/Southclaws/storyden/app/transports/http/openapi"
-	"github.com/Southclaws/storyden/app/transports/sse"
 	"github.com/Southclaws/storyden/internal/config"
 	"github.com/Southclaws/storyden/internal/integration"
 	"github.com/Southclaws/storyden/internal/integration/e2e"
@@ -43,10 +41,10 @@ func startSession(t *testing.T, ctx context.Context, ts *httptest.Server, sessio
 	sessionID := xid.New().String()
 
 	var textPart openapi.UIMessagePart
-	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.Text, Text: "hello"}))
+	require.NoError(t, textPart.FromTextUIPart(openapi.TextUIPart{Type: openapi.TextUIPartTypeText, Text: "hello"}))
 
 	var robotIDPtr *string
-	if robotID != "" {
+	if robotID = strings.TrimSpace(robotID); robotID != "" {
 		robotIDPtr = &robotID
 	}
 
@@ -62,7 +60,7 @@ func startSession(t *testing.T, ctx context.Context, ts *httptest.Server, sessio
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/sse/chat", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/api/robots/sessions", bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	require.NoError(t, session(ctx, req))
@@ -70,36 +68,33 @@ func startSession(t *testing.T, ctx context.Context, ts *httptest.Server, sessio
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	// Drain stream so the session is fully persisted before we query it.
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		if strings.TrimPrefix(scanner.Text(), "data: ") == "[DONE]" {
-			break
-		}
-	}
-	require.NoError(t, scanner.Err())
+	location := resp.Header.Get("Location")
+	require.NotEmpty(t, location)
+
+	_, err = robot.ReadDurableJSON[openapi.StreamPart](ctx, ts.URL+location, session)
+	require.NoError(t, err)
 
 	return sessionID
 }
 
-func TestRobotChatSSERequiresAuthWhenRobotsDisabled(t *testing.T) {
+func TestRobotSessionCreateRequiresAuthWhenRobotsDisabled(t *testing.T) {
 	t.Parallel()
 
-	integration.Test(t,
+	integration.Test(
+		t,
 		&config.Config{
 			LanguageModelProvider: "mock",
 		},
 		e2e.Setup(),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
 			ts *httptest.Server,
 		) {
 			lc.Append(fx.StartHook(func() {
-				req, err := http.NewRequestWithContext(root, http.MethodPost, ts.URL+"/sse/chat", strings.NewReader(`{}`))
+				req, err := http.NewRequestWithContext(root, http.MethodPost, ts.URL+"/api/robots/sessions", strings.NewReader(`{}`))
 				require.NoError(t, err)
 				req.Header.Set("Content-Type", "application/json")
 
@@ -122,13 +117,13 @@ func TestRobotChatSSERequiresAuthWhenRobotsDisabled(t *testing.T) {
 func TestRobotSessionsVisibility(t *testing.T) {
 	t.Parallel()
 
-	integration.Test(t,
+	integration.Test(
+		t,
 		&config.Config{
 			LanguageModelProvider: "mock",
 		},
 		e2e.Setup(),
 		robot.WithRobotSettings(mockModel),
-		sse.Build(),
 		fx.Invoke(func(
 			lc fx.Lifecycle,
 			root context.Context,
@@ -156,7 +151,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				nopermSession := sh.WithSession(nopermCtx)
 
 				// Create a robot for User A to chat with.
-				rb := tests.AssertRequest(cl.RobotCreateWithResponse(root,
+				rb := tests.AssertRequest(cl.RobotCreateWithResponse(
+					root,
 					openapi.RobotCreateJSONRequestBody{
 						Name:        "visibility-test-robot-" + uuid.NewString(),
 						Description: "Robot for session visibility tests",
@@ -174,7 +170,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("owner_can_list_own_sessions", func(t *testing.T) {
 					a := assert.New(t)
 
-					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(root,
+					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(
+						root,
 						&openapi.RobotSessionsListParams{},
 						userASession,
 					))(t, http.StatusOK)
@@ -192,7 +189,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("user_b_can_list_user_a_sessions_via_account_filter", func(t *testing.T) {
 					a := assert.New(t)
 
-					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(root,
+					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(
+						root,
 						&openapi.RobotSessionsListParams{AccountId: &userAIDParam},
 						userBSession,
 					))(t, http.StatusOK)
@@ -210,7 +208,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("user_b_default_list_includes_user_a_sessions", func(t *testing.T) {
 					a := assert.New(t)
 
-					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(root,
+					list := tests.AssertRequest(cl.RobotSessionsListWithResponse(
+						root,
 						&openapi.RobotSessionsListParams{},
 						userBSession,
 					))(t, http.StatusOK)
@@ -230,7 +229,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("user_b_can_get_user_a_session_by_id", func(t *testing.T) {
 					a := assert.New(t)
 
-					get := tests.AssertRequest(cl.RobotSessionGetWithResponse(root,
+					get := tests.AssertRequest(cl.RobotSessionGetWithResponse(
+						root,
 						sessionIDParam,
 						&openapi.RobotSessionGetParams{},
 						userBSession,
@@ -243,7 +243,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("owner_can_get_own_session_by_id", func(t *testing.T) {
 					a := assert.New(t)
 
-					get := tests.AssertRequest(cl.RobotSessionGetWithResponse(root,
+					get := tests.AssertRequest(cl.RobotSessionGetWithResponse(
+						root,
 						sessionIDParam,
 						&openapi.RobotSessionGetParams{},
 						userASession,
@@ -256,7 +257,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("noperm_cannot_list_sessions", func(t *testing.T) {
 					r := require.New(t)
 
-					resp, err := cl.RobotSessionsListWithResponse(root,
+					resp, err := cl.RobotSessionsListWithResponse(
+						root,
 						&openapi.RobotSessionsListParams{},
 						nopermSession,
 					)
@@ -267,7 +269,8 @@ func TestRobotSessionsVisibility(t *testing.T) {
 				t.Run("noperm_cannot_get_session_by_id", func(t *testing.T) {
 					r := require.New(t)
 
-					resp, err := cl.RobotSessionGetWithResponse(root,
+					resp, err := cl.RobotSessionGetWithResponse(
+						root,
 						sessionIDParam,
 						&openapi.RobotSessionGetParams{},
 						nopermSession,

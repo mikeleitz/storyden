@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	adktool "google.golang.org/adk/tool"
-	"google.golang.org/adk/tool/functiontool"
+	adkagent "google.golang.org/adk/v2/agent"
+	"google.golang.org/adk/v2/tool/functiontool"
 
 	"github.com/Southclaws/storyden/app/services/semdex/robot/workspaceprovider"
 	"github.com/Southclaws/storyden/lib/plugin/rpc"
@@ -45,7 +45,7 @@ func (a *Agent) addValidateTools(add toolAdder) error {
 	return add(functiontool.New(functiontool.Config{
 		Name:        "plugin_validate",
 		Description: "Check whether plugin source is ready to install. Runs manifest schema checks, manifest/code consistency checks, incomplete-implementation checks, gofmt, go mod tidy, go vet, plugin semantic lint, and go test. Use while iterating on source. Does not compile, package, upload, activate, or read runtime logs; plugin_install performs the single compile/package/install path.",
-	}, func(ctx adktool.Context, args ValidateInput) (ValidateResult, error) {
+	}, func(ctx adkagent.Context, args ValidateInput) (ValidateResult, error) {
 		return a.Validate(ctx, args)
 	}))
 }
@@ -207,8 +207,8 @@ func validationGoFailureNextAction(result ValidateResult) string {
 		text := strings.ToLower(strings.Join([]string{check.Message, check.Output, check.Error}, "\n"))
 		switch {
 		case strings.Contains(text, "robotrunwithresponse") ||
-			strings.Contains(text, "robotchatssewithresponse") ||
-			strings.Contains(text, "robotchatsse"):
+			strings.Contains(text, "robotsessioncreatewithresponse") ||
+			strings.Contains(text, "robotsessioncreate"):
 			return "Replace generated HTTP robot chat calls with pl.RunRobot(ctx, robotID, message), ensure manifest access.permissions includes USE_ROBOTS, then rerun plugin_validate."
 		case strings.Contains(text, "undefined") ||
 			strings.Contains(text, "unknown field") ||

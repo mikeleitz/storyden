@@ -429,6 +429,13 @@
       description: |-
         The issuer/discovery URL for the Keycloak realm (e.g. https://auth.example.com/realms/YourRealm).
 
+    - env: OAUTH_KEYCLOAK_DISPLAY_NAME
+      name: KeycloakDisplayName
+      type: string
+      default: Keycloak
+      description: |-
+        The display name shown for the Keycloak login button.
+
     - env: OAUTH_ENABLED
       name: OAuthEnabled
       type: bool
@@ -474,6 +481,13 @@
       type: net/url.URL
       description: |-
         Frontend URL used by OAuth Authorization Code Grant users to approve or deny consent.
+
+    - env: OAUTH_AUTHORISATION_LOGIN_URL
+      name: OAuthAuthorisationLoginURL
+      type: net/url.URL
+      documented_default: "{PUBLIC_WEB_ADDRESS}/login"
+      description: |-
+        Frontend URL to redirect unauthenticated users to when starting the OAuth Authorization Code flow without a session. Defaults to `{PUBLIC_WEB_ADDRESS}/login` when unset.
 
     - env: OAUTH_SIGNING_KEY_BASE64
       name: OAuthSigningKeyBase64

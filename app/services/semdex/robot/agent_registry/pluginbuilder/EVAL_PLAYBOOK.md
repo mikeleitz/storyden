@@ -1,8 +1,8 @@
-# Plugin Builder Eval Playbook
+# Plugin Studio Eval Playbook
 
-This playbook describes the manual eval loop for the built-in `plugin_builder`
-Robot against the real Storyden backend, Robot SSE transport, and workspace
-provider. Use it when changing Plugin Builder instructions, tool descriptions,
+This playbook describes the manual eval loop for the `system.plugin_studio`
+Toolset through Denbot, the real Storyden backend, Robot SSE transport,
+and workspace provider. Use it when changing Plugin Studio instructions, tool descriptions,
 tool schemas, tool result shaping, validation, install/update behavior, or
 workspace provisioning.
 
@@ -12,12 +12,12 @@ validation, or result shaping.
 
 ## What This Eval Covers
 
-A good Plugin Builder eval exercises the full managed flow:
+A good Plugin Studio eval exercises the full managed flow:
 
 1. Start a backend from the current tree.
 2. Authenticate as a local admin (ask the user for a cookie.)
 3. Attach a Robot workspace, usually Sprites.
-4. Send a realistic `/sse/chat` request to `plugin_builder`.
+4. Send a realistic `/api/robots/sessions` request to Denbot with a workspace mounted.
 5. Capture the full SSE stream and backend logs.
 6. Inspect the session transcript, tool calls, generated workspace, and
    installed plugin state.
@@ -89,7 +89,7 @@ it back to `http://localhost`. Passing the cookie explicitly is usually simpler:
 SESSION_COOKIE='storyden-session=<value-from-signin>'
 ```
 
-If `/sse/chat` returns `Unauthorized`, the cookie was not sent or the session is
+If `/api/robots/sessions` returns `Unauthorized`, the cookie was not sent or the session is
 invalid.
 
 ## Choose A Workspace
@@ -109,10 +109,10 @@ coverage:
 WORKSPACE_ID=d92op7do2dtjpvta6jh0
 ```
 
-If `/sse/chat` returns:
+If `/api/robots/sessions` returns:
 
 ```text
-Plugin Builder requires an active Robot workspace
+Plugin Studio requires an active Robot workspace
 ```
 
 then the request body did not include a valid workspace mount, or the backend
@@ -172,7 +172,6 @@ jq -n \
   '{
     id: $sid,
     sessionId: $sid,
-    robotId: "plugin_builder",
     workspace: { workspace_id: $workspace },
     messages: [
       {
@@ -191,7 +190,7 @@ curl -sS -N --max-time 900 \
   -H 'Content-Type: application/json' \
   -H "Cookie: $SESSION_COOKIE" \
   --data @"$REQUEST" \
-  http://localhost:8000/sse/chat | tee "$STREAM"
+  http://localhost:8000/api/robots/sessions | tee "$STREAM"
 ```
 
 Long initial silence can be normal while the backend mounts or provisions the
@@ -271,7 +270,7 @@ A passing eval should show:
 For Robot integration specifically:
 
 - Correct: `pl.RunRobot(ctx, robotID, message)`.
-- Incorrect: generated HTTP `RobotChatSSE`, `RobotChatSSEWithResponse`,
+- Incorrect: generated HTTP `RobotSessionCreate`, `RobotSessionCreateWithResponse`,
   `RobotRunWithResponse`, or manually parsing UI chat streams from a plugin.
 - Manifest access includes `USE_ROBOTS` when the plugin calls `RunRobot`.
 
@@ -343,7 +342,7 @@ These checks caught real issues and should remain part of future eval review:
   JSON marshal/unmarshal into tagged config structs.
 - The Robot does not add dummy `_ = raw["field"]` reads just to satisfy a
   validator.
-- The Robot does not call `RobotChatSSE` or any UI streaming endpoint from a
+- The Robot does not call `RobotSessionCreate` or any UI streaming endpoint from a
   plugin.
 - Optional configuration fields are either implemented or omitted. Do not let
   the Robot add "reserved for future use" fields while claiming the request is

@@ -3,6 +3,7 @@
 package robotsession
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -25,19 +26,42 @@ const (
 	FieldAccountID = "account_id"
 	// FieldState holds the string denoting the state field in the database.
 	FieldState = "state"
-	// EdgeUser holds the string denoting the user edge name in mutations.
-	EdgeUser = "user"
+	// FieldExecutionStatus holds the string denoting the execution_status field in the database.
+	FieldExecutionStatus = "execution_status"
+	// FieldActiveTurnID holds the string denoting the active_turn_id field in the database.
+	FieldActiveTurnID = "active_turn_id"
+	// FieldLeaseToken holds the string denoting the lease_token field in the database.
+	FieldLeaseToken = "lease_token"
+	// FieldLeaseGeneration holds the string denoting the lease_generation field in the database.
+	FieldLeaseGeneration = "lease_generation"
+	// FieldNextEventSequence holds the string denoting the next_event_sequence field in the database.
+	FieldNextEventSequence = "next_event_sequence"
+	// FieldLeaseExpiresAt holds the string denoting the lease_expires_at field in the database.
+	FieldLeaseExpiresAt = "lease_expires_at"
+	// EdgeCreator holds the string denoting the creator edge name in mutations.
+	EdgeCreator = "creator"
+	// EdgeViews holds the string denoting the views edge name in mutations.
+	EdgeViews = "views"
 	// EdgeMessages holds the string denoting the messages edge name in mutations.
 	EdgeMessages = "messages"
+	// EdgeTurns holds the string denoting the turns edge name in mutations.
+	EdgeTurns = "turns"
 	// Table holds the table name of the robotsession in the database.
 	Table = "robot_sessions"
-	// UserTable is the table that holds the user relation/edge.
-	UserTable = "robot_sessions"
-	// UserInverseTable is the table name for the Account entity.
+	// CreatorTable is the table that holds the creator relation/edge.
+	CreatorTable = "robot_sessions"
+	// CreatorInverseTable is the table name for the Account entity.
 	// It exists in this package in order to avoid circular dependency with the "account" package.
-	UserInverseTable = "accounts"
-	// UserColumn is the table column denoting the user relation/edge.
-	UserColumn = "account_id"
+	CreatorInverseTable = "accounts"
+	// CreatorColumn is the table column denoting the creator relation/edge.
+	CreatorColumn = "account_id"
+	// ViewsTable is the table that holds the views relation/edge.
+	ViewsTable = "robot_session_views"
+	// ViewsInverseTable is the table name for the RobotSessionView entity.
+	// It exists in this package in order to avoid circular dependency with the "robotsessionview" package.
+	ViewsInverseTable = "robot_session_views"
+	// ViewsColumn is the table column denoting the views relation/edge.
+	ViewsColumn = "session_id"
 	// MessagesTable is the table that holds the messages relation/edge.
 	MessagesTable = "robot_session_messages"
 	// MessagesInverseTable is the table name for the RobotSessionMessage entity.
@@ -45,6 +69,13 @@ const (
 	MessagesInverseTable = "robot_session_messages"
 	// MessagesColumn is the table column denoting the messages relation/edge.
 	MessagesColumn = "session_id"
+	// TurnsTable is the table that holds the turns relation/edge.
+	TurnsTable = "robot_session_turns"
+	// TurnsInverseTable is the table name for the RobotSessionTurn entity.
+	// It exists in this package in order to avoid circular dependency with the "robotsessionturn" package.
+	TurnsInverseTable = "robot_session_turns"
+	// TurnsColumn is the table column denoting the turns relation/edge.
+	TurnsColumn = "session_id"
 )
 
 // Columns holds all SQL columns for robotsession fields.
@@ -55,6 +86,12 @@ var Columns = []string{
 	FieldName,
 	FieldAccountID,
 	FieldState,
+	FieldExecutionStatus,
+	FieldActiveTurnID,
+	FieldLeaseToken,
+	FieldLeaseGeneration,
+	FieldNextEventSequence,
+	FieldLeaseExpiresAt,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -76,11 +113,42 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// DefaultName holds the default value on creation for the "name" field.
 	DefaultName func() string
+	// DefaultLeaseGeneration holds the default value on creation for the "lease_generation" field.
+	DefaultLeaseGeneration uint64
+	// DefaultNextEventSequence holds the default value on creation for the "next_event_sequence" field.
+	DefaultNextEventSequence uint64
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() xid.ID
 	// IDValidator is a validator for the "id" field. It is called by the builders before save.
 	IDValidator func(string) error
 )
+
+// ExecutionStatus defines the type for the "execution_status" enum field.
+type ExecutionStatus string
+
+// ExecutionStatusIdle is the default value of the ExecutionStatus enum.
+const DefaultExecutionStatus = ExecutionStatusIdle
+
+// ExecutionStatus values.
+const (
+	ExecutionStatusIdle    ExecutionStatus = "idle"
+	ExecutionStatusRunning ExecutionStatus = "running"
+	ExecutionStatusBlocked ExecutionStatus = "blocked"
+)
+
+func (es ExecutionStatus) String() string {
+	return string(es)
+}
+
+// ExecutionStatusValidator is a validator for the "execution_status" field enum values. It is called by the builders before save.
+func ExecutionStatusValidator(es ExecutionStatus) error {
+	switch es {
+	case ExecutionStatusIdle, ExecutionStatusRunning, ExecutionStatusBlocked:
+		return nil
+	default:
+		return fmt.Errorf("robotsession: invalid enum value for execution_status field: %q", es)
+	}
+}
 
 // OrderOption defines the ordering options for the RobotSession queries.
 type OrderOption func(*sql.Selector)
@@ -110,10 +178,54 @@ func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAccountID, opts...).ToFunc()
 }
 
-// ByUserField orders the results by user field.
-func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByExecutionStatus orders the results by the execution_status field.
+func ByExecutionStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecutionStatus, opts...).ToFunc()
+}
+
+// ByActiveTurnID orders the results by the active_turn_id field.
+func ByActiveTurnID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldActiveTurnID, opts...).ToFunc()
+}
+
+// ByLeaseToken orders the results by the lease_token field.
+func ByLeaseToken(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLeaseToken, opts...).ToFunc()
+}
+
+// ByLeaseGeneration orders the results by the lease_generation field.
+func ByLeaseGeneration(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLeaseGeneration, opts...).ToFunc()
+}
+
+// ByNextEventSequence orders the results by the next_event_sequence field.
+func ByNextEventSequence(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNextEventSequence, opts...).ToFunc()
+}
+
+// ByLeaseExpiresAt orders the results by the lease_expires_at field.
+func ByLeaseExpiresAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLeaseExpiresAt, opts...).ToFunc()
+}
+
+// ByCreatorField orders the results by creator field.
+func ByCreatorField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newUserStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborTerms(s, newCreatorStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByViewsCount orders the results by views count.
+func ByViewsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newViewsStep(), opts...)
+	}
+}
+
+// ByViews orders the results by views terms.
+func ByViews(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newViewsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -130,11 +242,32 @@ func ByMessages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newMessagesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newUserStep() *sqlgraph.Step {
+
+// ByTurnsCount orders the results by turns count.
+func ByTurnsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTurnsStep(), opts...)
+	}
+}
+
+// ByTurns orders the results by turns terms.
+func ByTurns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTurnsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newCreatorStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(UserInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, UserTable, UserColumn),
+		sqlgraph.To(CreatorInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, CreatorTable, CreatorColumn),
+	)
+}
+func newViewsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ViewsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ViewsTable, ViewsColumn),
 	)
 }
 func newMessagesStep() *sqlgraph.Step {
@@ -142,5 +275,12 @@ func newMessagesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(MessagesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, MessagesTable, MessagesColumn),
+	)
+}
+func newTurnsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TurnsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, TurnsTable, TurnsColumn),
 	)
 }

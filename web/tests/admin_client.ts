@@ -3,9 +3,14 @@ import { getAccountAddRoleMutationKey } from "../src/api/openapi-client/accounts
 import { getAdminSettingsUpdateMutationKey } from "../src/api/openapi-client/admin";
 import { getCategoryCreateMutationKey } from "../src/api/openapi-client/categories";
 import { getNodeCreateMutationKey } from "../src/api/openapi-client/nodes";
+import {
+  getPluginAddMutationKey,
+  getPluginDeleteMutationKey,
+} from "../src/api/openapi-client/plugins";
 import { getReplyCreateMutationKey } from "../src/api/openapi-client/replies";
 import {
   getRobotCreateMutationKey,
+  getRobotDeleteMutationKey,
   getRobotGetKey,
   getRobotProviderUpdateMutationKey,
 } from "../src/api/openapi-client/robots";
@@ -18,6 +23,8 @@ import {
   CategoryCreateOKResponse,
   NodeCreateBody,
   NodeCreateOKResponse,
+  PluginGetOKResponse,
+  PluginInitialProps,
   ReplyCreateBody,
   ReplyCreateOKResponse,
   RobotCreateBody,
@@ -47,12 +54,15 @@ export type AccessKeyClient = {
     threadSlug: string,
     replyCreateBody: ReplyCreateBody,
   ) => Promise<ReplyCreateOKResponse>;
-  nodeCreate: (
-    nodeCreateBody: NodeCreateBody,
-  ) => Promise<NodeCreateOKResponse>;
+  nodeCreate: (nodeCreateBody: NodeCreateBody) => Promise<NodeCreateOKResponse>;
+  pluginAdd: (
+    pluginInitialProps: PluginInitialProps,
+  ) => Promise<PluginGetOKResponse>;
+  pluginDelete: (pluginInstanceId: string) => Promise<void>;
   robotCreate: (
     robotCreateBody: RobotCreateBody,
   ) => Promise<RobotCreateOKResponse>;
+  robotDelete: (robotId: string) => Promise<void>;
   robotGet: (robotId: string) => Promise<RobotGetOKResponse>;
   robotProviderUpdate: (
     provider: string,
@@ -74,7 +84,7 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getAdminSettingsUpdateMutationKey(),
         method: "PATCH",
-        data: adminSettingsUpdateBody,
+        body: adminSettingsUpdateBody,
       });
     },
     categoryCreate: async (categoryCreateBody) => {
@@ -82,7 +92,7 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getCategoryCreateMutationKey(),
         method: "POST",
-        data: categoryCreateBody,
+        body: categoryCreateBody,
       });
     },
     threadCreate: async (threadCreateBody) => {
@@ -90,7 +100,7 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getThreadCreateMutationKey(),
         method: "POST",
-        data: threadCreateBody,
+        body: threadCreateBody,
       });
     },
     replyCreate: async (threadSlug, replyCreateBody) => {
@@ -98,7 +108,7 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getReplyCreateMutationKey(threadSlug),
         method: "POST",
-        data: replyCreateBody,
+        body: replyCreateBody,
       });
     },
     nodeCreate: async (nodeCreateBody) => {
@@ -106,7 +116,22 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getNodeCreateMutationKey(),
         method: "POST",
-        data: nodeCreateBody,
+        body: nodeCreateBody,
+      });
+    },
+    pluginAdd: async (pluginInitialProps) => {
+      return await requestWithAccessKey<PluginGetOKResponse>({
+        accessKey,
+        key: getPluginAddMutationKey(),
+        method: "POST",
+        body: pluginInitialProps,
+      });
+    },
+    pluginDelete: async (pluginInstanceId) => {
+      await requestWithAccessKey<void>({
+        accessKey,
+        key: getPluginDeleteMutationKey(pluginInstanceId),
+        method: "DELETE",
       });
     },
     robotCreate: async (robotCreateBody) => {
@@ -114,7 +139,14 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getRobotCreateMutationKey(),
         method: "POST",
-        data: robotCreateBody,
+        body: robotCreateBody,
+      });
+    },
+    robotDelete: async (robotId) => {
+      await requestWithAccessKey<void>({
+        accessKey,
+        key: getRobotDeleteMutationKey(robotId),
+        method: "DELETE",
       });
     },
     robotGet: async (robotId) => {
@@ -129,7 +161,7 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getRobotProviderUpdateMutationKey(provider),
         method: "PATCH",
-        data: robotProviderUpdateBody,
+        body: robotProviderUpdateBody,
       });
     },
   };
@@ -139,24 +171,23 @@ async function requestWithAccessKey<T>({
   accessKey,
   key,
   method,
-  data,
+  body,
 }: {
   accessKey: string;
   key: readonly [string];
-  method: "GET" | "PATCH" | "POST" | "PUT";
-  data?: unknown;
+  method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+  body?: unknown;
 }): Promise<T> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessKey}`,
   };
-  if (data !== undefined) {
+  if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
-  const request = buildRequest({
-    url: key[0],
+  const request = buildRequest(key[0], {
     method,
-    data,
+    body,
     headers,
   });
 

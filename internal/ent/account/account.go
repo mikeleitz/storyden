@@ -118,16 +118,22 @@ const (
 	EdgeAuthoredWarnings = "authored_warnings"
 	// EdgeRobots holds the string denoting the robots edge name in mutations.
 	EdgeRobots = "robots"
+	// EdgeRobotToolsets holds the string denoting the robot_toolsets edge name in mutations.
+	EdgeRobotToolsets = "robot_toolsets"
 	// EdgeRobotWorkspaces holds the string denoting the robot_workspaces edge name in mutations.
 	EdgeRobotWorkspaces = "robot_workspaces"
 	// EdgeRobotWorkspaceInstances holds the string denoting the robot_workspace_instances edge name in mutations.
 	EdgeRobotWorkspaceInstances = "robot_workspace_instances"
 	// EdgeRobotMcpServers holds the string denoting the robot_mcp_servers edge name in mutations.
 	EdgeRobotMcpServers = "robot_mcp_servers"
-	// EdgeRobotSessions holds the string denoting the robot_sessions edge name in mutations.
-	EdgeRobotSessions = "robot_sessions"
+	// EdgeCreatedRobotSessions holds the string denoting the created_robot_sessions edge name in mutations.
+	EdgeCreatedRobotSessions = "created_robot_sessions"
+	// EdgeRobotSessionViews holds the string denoting the robot_session_views edge name in mutations.
+	EdgeRobotSessionViews = "robot_session_views"
 	// EdgeRobotMessages holds the string denoting the robot_messages edge name in mutations.
 	EdgeRobotMessages = "robot_messages"
+	// EdgeInitiatedRobotTurns holds the string denoting the initiated_robot_turns edge name in mutations.
+	EdgeInitiatedRobotTurns = "initiated_robot_turns"
 	// EdgeAccountRoles holds the string denoting the account_roles edge name in mutations.
 	EdgeAccountRoles = "account_roles"
 	// Table holds the table name of the account in the database.
@@ -387,6 +393,13 @@ const (
 	RobotsInverseTable = "robots"
 	// RobotsColumn is the table column denoting the robots relation/edge.
 	RobotsColumn = "author_id"
+	// RobotToolsetsTable is the table that holds the robot_toolsets relation/edge.
+	RobotToolsetsTable = "robot_toolsets"
+	// RobotToolsetsInverseTable is the table name for the RobotToolset entity.
+	// It exists in this package in order to avoid circular dependency with the "robottoolset" package.
+	RobotToolsetsInverseTable = "robot_toolsets"
+	// RobotToolsetsColumn is the table column denoting the robot_toolsets relation/edge.
+	RobotToolsetsColumn = "author_id"
 	// RobotWorkspacesTable is the table that holds the robot_workspaces relation/edge.
 	RobotWorkspacesTable = "robot_workspaces"
 	// RobotWorkspacesInverseTable is the table name for the RobotWorkspace entity.
@@ -408,13 +421,20 @@ const (
 	RobotMcpServersInverseTable = "robot_mcp_servers"
 	// RobotMcpServersColumn is the table column denoting the robot_mcp_servers relation/edge.
 	RobotMcpServersColumn = "added_by"
-	// RobotSessionsTable is the table that holds the robot_sessions relation/edge.
-	RobotSessionsTable = "robot_sessions"
-	// RobotSessionsInverseTable is the table name for the RobotSession entity.
+	// CreatedRobotSessionsTable is the table that holds the created_robot_sessions relation/edge.
+	CreatedRobotSessionsTable = "robot_sessions"
+	// CreatedRobotSessionsInverseTable is the table name for the RobotSession entity.
 	// It exists in this package in order to avoid circular dependency with the "robotsession" package.
-	RobotSessionsInverseTable = "robot_sessions"
-	// RobotSessionsColumn is the table column denoting the robot_sessions relation/edge.
-	RobotSessionsColumn = "account_id"
+	CreatedRobotSessionsInverseTable = "robot_sessions"
+	// CreatedRobotSessionsColumn is the table column denoting the created_robot_sessions relation/edge.
+	CreatedRobotSessionsColumn = "account_id"
+	// RobotSessionViewsTable is the table that holds the robot_session_views relation/edge.
+	RobotSessionViewsTable = "robot_session_views"
+	// RobotSessionViewsInverseTable is the table name for the RobotSessionView entity.
+	// It exists in this package in order to avoid circular dependency with the "robotsessionview" package.
+	RobotSessionViewsInverseTable = "robot_session_views"
+	// RobotSessionViewsColumn is the table column denoting the robot_session_views relation/edge.
+	RobotSessionViewsColumn = "account_id"
 	// RobotMessagesTable is the table that holds the robot_messages relation/edge.
 	RobotMessagesTable = "robot_session_messages"
 	// RobotMessagesInverseTable is the table name for the RobotSessionMessage entity.
@@ -422,6 +442,13 @@ const (
 	RobotMessagesInverseTable = "robot_session_messages"
 	// RobotMessagesColumn is the table column denoting the robot_messages relation/edge.
 	RobotMessagesColumn = "account_id"
+	// InitiatedRobotTurnsTable is the table that holds the initiated_robot_turns relation/edge.
+	InitiatedRobotTurnsTable = "robot_session_turns"
+	// InitiatedRobotTurnsInverseTable is the table name for the RobotSessionTurn entity.
+	// It exists in this package in order to avoid circular dependency with the "robotsessionturn" package.
+	InitiatedRobotTurnsInverseTable = "robot_session_turns"
+	// InitiatedRobotTurnsColumn is the table column denoting the initiated_robot_turns relation/edge.
+	InitiatedRobotTurnsColumn = "initiated_by_account_id"
 	// AccountRolesTable is the table that holds the account_roles relation/edge.
 	AccountRolesTable = "account_roles"
 	// AccountRolesInverseTable is the table name for the AccountRoles entity.
@@ -1120,6 +1147,20 @@ func ByRobots(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByRobotToolsetsCount orders the results by robot_toolsets count.
+func ByRobotToolsetsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRobotToolsetsStep(), opts...)
+	}
+}
+
+// ByRobotToolsets orders the results by robot_toolsets terms.
+func ByRobotToolsets(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRobotToolsetsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByRobotWorkspacesCount orders the results by robot_workspaces count.
 func ByRobotWorkspacesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -1162,17 +1203,31 @@ func ByRobotMcpServers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByRobotSessionsCount orders the results by robot_sessions count.
-func ByRobotSessionsCount(opts ...sql.OrderTermOption) OrderOption {
+// ByCreatedRobotSessionsCount orders the results by created_robot_sessions count.
+func ByCreatedRobotSessionsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newRobotSessionsStep(), opts...)
+		sqlgraph.OrderByNeighborsCount(s, newCreatedRobotSessionsStep(), opts...)
 	}
 }
 
-// ByRobotSessions orders the results by robot_sessions terms.
-func ByRobotSessions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByCreatedRobotSessions orders the results by created_robot_sessions terms.
+func ByCreatedRobotSessions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newRobotSessionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newCreatedRobotSessionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByRobotSessionViewsCount orders the results by robot_session_views count.
+func ByRobotSessionViewsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRobotSessionViewsStep(), opts...)
+	}
+}
+
+// ByRobotSessionViews orders the results by robot_session_views terms.
+func ByRobotSessionViews(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRobotSessionViewsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -1187,6 +1242,20 @@ func ByRobotMessagesCount(opts ...sql.OrderTermOption) OrderOption {
 func ByRobotMessages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newRobotMessagesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByInitiatedRobotTurnsCount orders the results by initiated_robot_turns count.
+func ByInitiatedRobotTurnsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newInitiatedRobotTurnsStep(), opts...)
+	}
+}
+
+// ByInitiatedRobotTurns orders the results by initiated_robot_turns terms.
+func ByInitiatedRobotTurns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newInitiatedRobotTurnsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -1462,6 +1531,13 @@ func newRobotsStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.O2M, false, RobotsTable, RobotsColumn),
 	)
 }
+func newRobotToolsetsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RobotToolsetsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RobotToolsetsTable, RobotToolsetsColumn),
+	)
+}
 func newRobotWorkspacesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -1483,11 +1559,18 @@ func newRobotMcpServersStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.O2M, false, RobotMcpServersTable, RobotMcpServersColumn),
 	)
 }
-func newRobotSessionsStep() *sqlgraph.Step {
+func newCreatedRobotSessionsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(RobotSessionsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, RobotSessionsTable, RobotSessionsColumn),
+		sqlgraph.To(CreatedRobotSessionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, CreatedRobotSessionsTable, CreatedRobotSessionsColumn),
+	)
+}
+func newRobotSessionViewsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RobotSessionViewsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RobotSessionViewsTable, RobotSessionViewsColumn),
 	)
 }
 func newRobotMessagesStep() *sqlgraph.Step {
@@ -1495,6 +1578,13 @@ func newRobotMessagesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(RobotMessagesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, RobotMessagesTable, RobotMessagesColumn),
+	)
+}
+func newInitiatedRobotTurnsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(InitiatedRobotTurnsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, InitiatedRobotTurnsTable, InitiatedRobotTurnsColumn),
 	)
 }
 func newAccountRolesStep() *sqlgraph.Step {

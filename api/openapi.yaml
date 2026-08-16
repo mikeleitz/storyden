@@ -27,7 +27,7 @@ info:
     a more fixed versioning strategy in the future. Ultimately, the primary way
     Storyden tracks versions is dates, there are no set release tags currently.
   title: storyden
-  version: "v1.26.13-post"
+  version: "v1.26.15-post"
 
 servers:
   - url: "/api"
@@ -46,7 +46,6 @@ security:
 x-types:
   cache_response_headers: &cache_response_headers
     Cache-Control: { $ref: "#/components/headers/Cache-Control" }
-    Last-Modified: { $ref: "#/components/headers/Last-Modified" }
     ETag: { $ref: "#/components/headers/ETag" }
 
 tags:
@@ -570,7 +569,11 @@ paths:
         Refresh tokens are account-owned grants for an OAuth client. Revoking a
         refresh token prevents future token renewal, but does not immediately
         invalidate already-issued JWT access tokens.
+
+        Rotation writes a new row per refresh, so this table grows with usage
+        and the response is paginated.
       tags: [admin]
+      parameters: [{ $ref: "#/components/parameters/PaginationQuery" }]
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1147,6 +1150,11 @@ paths:
       description: |
         Verify an email address using a token that was emailed to one of the
         account's email addresses either set via sign up or added later.
+
+        The code is only six digits, so this endpoint MUST be rate limited to
+        keep the search space out of reach of an unauthenticated caller.
+      x-storyden:
+        rate-limit-cost: 10
       tags: [auth]
       requestBody: { $ref: "#/components/requestBodies/AuthEmailVerify" }
       responses:
@@ -1233,6 +1241,8 @@ paths:
         Reading consent claims the user code for the signed-in account. This
         prevents another account from approving the same code after it has been
         displayed.
+      x-storyden:
+        rate-limit-cost: 20
       tags: [auth]
       security: [browser: []]
       parameters: [{ $ref: "#/components/parameters/OAuthUserCodeQuery" }]
@@ -1251,6 +1261,8 @@ paths:
         account permissions and client policy. For first-party inherited clients
         this means the final token scope may include Storyden permission scopes
         that were not present in the original device authorisation request.
+      x-storyden:
+        rate-limit-cost: 20
       tags: [auth]
       security: [browser: []]
       requestBody:
@@ -1265,24 +1277,30 @@ paths:
     get:
       operationId: OAuthAuthorise
       description: |
-        Start the browser-based OAuth 2.0 Authorization Code flow with PKCE.
+        Start the OAuth 2.0 Authorization Code flow with PKCE.
 
-        This endpoint requires a browser session. If the account is not signed
-        in, Storyden redirects to the frontend login route instead of returning
-        a protocol redirect to the client application.
+        This endpoint accepts either a browser session (`storyden-session`
+        cookie) or a personal access key (`Authorization: Bearer <key>`),
+        letting a headless script drive the whole flow without ever loading
+        the web frontend. If neither credential is present, Storyden redirects
+        to a login URL instead of returning a protocol redirect to the client
+        application; this defaults to the frontend login route and can be
+        changed with `OAUTH_AUTHORISATION_LOGIN_URL`.
 
         Unlike many OAuth servers, Storyden does not render a consent page from
         this API endpoint. A valid request creates a short-lived pending
-        authorisation request and redirects the browser to the configured
-        frontend authorisation-code consent URL. Custom frontends can change
-        this URL with `OAUTH_AUTHORISATION_CODE_CONSENT_URL`.
+        authorisation request and redirects to the configured
+        authorisation-code consent URL. A script can parse `request_id` out of
+        that redirect's query string and drive `/oauth/authorize/consent`
+        directly instead of following the redirect in a browser. Custom
+        frontends can change this URL with `OAUTH_AUTHORISATION_CODE_CONSENT_URL`.
 
         The `scope` parameter follows OAuth 2.0 and is optional. Empty or
         omitted scope means no requested scopes. Storyden permission scopes are
         granted only when allowed by the client and by the signed-in account's
         current permissions.
       tags: [auth]
-      security: [browser: []]
+      security: [browser: [], access_key: []]
       parameters:
         - { $ref: "#/components/parameters/OAuthResponseTypeQuery" }
         - { $ref: "#/components/parameters/OAuthClientIDQuery" }
@@ -1297,26 +1315,29 @@ paths:
         "200": { $ref: "#/components/responses/OAuthAuthoriseOK" }
         "302": { $ref: "#/components/responses/OAuthAuthoriseFound" }
         "400": { $ref: "#/components/responses/OAuthError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /oauth/authorize/consent:
     get:
       operationId: OAuthAuthoriseConsent
       description: |
         Read a pending OAuth authorisation code request for a signed-in user
-        before they approve or deny consent in the frontend.
+        before they approve or deny consent.
 
         This is a Storyden frontend/API integration endpoint, not an OAuth
         protocol endpoint. It returns the client, redirect URI, requested
-        scopes, and currently grantable scopes so the frontend can render a
-        consent screen.
+        scopes, and currently grantable scopes so a caller can render a
+        consent screen or, for headless integrations, decide programmatically.
+        Accepts either a browser session or a personal access key.
       tags: [auth]
-      security: [browser: []]
+      security: [browser: [], access_key: []]
       parameters:
         - $ref: "#/components/parameters/OAuthAuthorizationRequestIDQuery"
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "400": { $ref: "#/components/responses/OAuthError" }
         "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "200": { $ref: "#/components/responses/OAuthAuthoriseConsentOK" }
     post:
       operationId: OAuthAuthoriseConsentSubmit
@@ -1329,15 +1350,17 @@ paths:
         denial the returned redirect URI contains `error=access_denied`.
 
         Storyden recomputes the granted scope at approval time from current
-        account permissions and client policy.
+        account permissions and client policy. Accepts either a browser
+        session or a personal access key.
       tags: [auth]
-      security: [browser: []]
+      security: [browser: [], access_key: []]
       requestBody:
         $ref: "#/components/requestBodies/OAuthAuthoriseConsentSubmit"
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "400": { $ref: "#/components/responses/OAuthError" }
         "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "200": { $ref: "#/components/responses/OAuthAuthoriseConsentSubmitOK" }
 
   /oauth/token:
@@ -1591,6 +1614,7 @@ paths:
         therefore do not appear in the member OAuth client list.
       tags: [auth]
       security: [browser: []]
+      parameters: [{ $ref: "#/components/parameters/PaginationQuery" }]
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "401": { $ref: "#/components/responses/Unauthorised" }
@@ -2515,9 +2539,15 @@ paths:
   /tags:
     get:
       operationId: TagList
-      description: Get a list of all tags on the site.
+      description: |
+        Get a list of tags on the site, most used first.
+
+        The tag table grows with content, so results are paginated. Callers
+        that only need suggestions can read the first page and stop.
       tags: [tags]
-      parameters: [$ref: "#/components/parameters/SearchQuery"]
+      parameters:
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/PaginationQuery"
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "200": { $ref: "#/components/responses/TagListOK" }
@@ -2861,11 +2891,15 @@ paths:
         "200": { $ref: "#/components/responses/CollectionCreateOK" }
     get:
       operationId: CollectionList
-      description: List all collections using the filtering options.
+      description: |
+        List collections using the filtering options, newest first.
+
+        Collections accumulate with members, so results are paginated.
       tags: [collections]
       parameters:
         - { $ref: "#/components/parameters/AccountHandleQueryParam" }
         - { $ref: "#/components/parameters/CollectionHasItemQueryParam" }
+        - { $ref: "#/components/parameters/PaginationQuery" }
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -3773,16 +3807,18 @@ paths:
       description: |
         Create a new Robot with the specified configuration. A Robot in Storyden
         consists of a name and description (for humans) as well as a playbook,
-        and a set of available tools to interact with Storyden or plugins. The
-        playbook is a detailed set of instructions that guides behaviour of the
-        Robot to help it assist members in achieving a specific automation goal.
-        Tools are available from either Storyden or plugins that allow it to
-        perform actions or query data. Robots never need all tools and it's best
-        to build goal-specific Robots with minimal sets of tools.
+        and a set of direct tools and reusable Toolsets to interact with Storyden
+        or plugins. The playbook is a detailed set of instructions that guides
+        behaviour of the Robot to help it assist members in achieving a specific
+        automation goal.
+        Direct tools support narrowly scoped Robots, while Toolsets bundle tools
+        with optional specialist instructions. Toolsets can be shared across
+        Robots and can come from Storyden, members, or plugins.
       tags: [robots]
       requestBody: { $ref: "#/components/requestBodies/RobotCreate" }
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorised" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "200": { $ref: "#/components/responses/RobotCreateOK" }
@@ -3801,30 +3837,75 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "200": { $ref: "#/components/responses/RobotToolsListOK" }
 
-  /robots/chat/sse:
-    post:
-      operationId: RobotChatSSE
+  /robots/toolsets:
+    get:
+      operationId: RobotToolsetsList
+      summary: List Robot Toolsets
       description: |
-        Send a message to a Robot and receive its response. This endpoint
-        manages sessions automatically, creating new sessions as needed or
-        continuing existing sessions based on the provided session ID.
-
-        Each message sent to the Robot is processed according to its playbook
-        and available tools, allowing it to perform actions or retrieve data
-        as part of the conversation. The response from the Robot includes its
-        reply message along with any actions taken during the interaction.
-
-        This endpoint is a Server Sent Events (SSE) stream, meaning that the
-        response is streamed back to the client in real-time as the Robot
-        generates its reply.
+        List reusable Toolsets available to Robots. Toolsets group tools with
+        optional instructions and may be provided by Storyden, members, or
+        plugins.
       tags: [robots]
-      requestBody: { $ref: "#/components/requestBodies/RobotChatStart" }
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { $ref: "#/components/responses/RobotToolsetsListOK" }
+    post:
+      operationId: RobotToolsetCreate
+      summary: Create a Robot Toolset
+      description: Create a reusable member-authored Toolset.
+      tags: [robots]
+      requestBody: { $ref: "#/components/requestBodies/RobotToolsetCreate" }
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { $ref: "#/components/responses/RobotToolsetGetOK" }
+
+  /robots/toolsets/{toolset_id}:
+    get:
+      operationId: RobotToolsetGet
+      summary: Get a Robot Toolset
+      description: Retrieve a built-in, custom, or plugin Toolset by ID.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotToolsetIDParam"
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthorised" }
+        "200": { $ref: "#/components/responses/RobotToolsetGetOK" }
+    patch:
+      operationId: RobotToolsetUpdate
+      summary: Update a Robot Toolset
+      description: Update a member-authored Toolset.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotToolsetIDParam"
+      requestBody: { $ref: "#/components/requestBodies/RobotToolsetUpdate" }
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "200": { $ref: "#/components/responses/RobotChatStream" }
+        "200": { $ref: "#/components/responses/RobotToolsetGetOK" }
+    delete:
+      operationId: RobotToolsetDelete
+      summary: Delete a Robot Toolset
+      description: Delete an unused member-authored Toolset.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotToolsetIDParam"
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { description: OK }
 
   /robots/providers:
     get:
@@ -4027,13 +4108,14 @@ paths:
       operationId: RobotUpdate
       summary: Update a robot
       description: |
-        Update a Robot's name, description, playbook or available tools.
+        Update a Robot's name, description, playbook, direct tools, or assigned Toolsets.
       tags: [robots]
       parameters:
         - $ref: "#/components/parameters/RobotIDParam"
       requestBody: { $ref: "#/components/requestBodies/RobotUpdate" }
       responses:
         default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthorised" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -4053,15 +4135,34 @@ paths:
         "200": { description: OK }
 
   /robots/sessions:
+    post:
+      operationId: RobotSessionCreate
+      summary: Start a Robot session turn
+      description: |
+        Start a turn in a Robot session. The session is created when it does
+        not already exist. New sessions use Denbot unless `robotId` selects a
+        custom Robot, which then remains the root Robot for the session.
+
+        The turn runs asynchronously. The response identifies the turn stream
+        that clients can read immediately and resume later.
+      tags: [robots]
+      requestBody: { $ref: "#/components/requestBodies/RobotChatStart" }
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "201": { $ref: "#/components/responses/RobotSessionStreamCreated" }
     get:
       operationId: RobotSessionsList
       summary: List robot sessions
       description: |
         Get a paginated list of Robot sessions. These are chat sessions with the
-        Robot system. One session may span multiple Robots as members can switch
-        which Robot they are talking to mid conversation, or the Robot itself
-        may choose to switch to another Robot to achieve a goal. A session is a
-        representation of an entire conversation thread with the Robot system.
+        Robot system. Denbot may delegate work to specialised Robots
+        inside the same session. Delegated events retain their ADK branch and
+        isolation scope so the execution tree remains inspectable.
 
         You may include an account ID to filter sessions by account. Only those
         with "USE_ROBOTS" permission can use Robots, however sessions, messages
@@ -4076,6 +4177,62 @@ paths:
         default: { $ref: "#/components/responses/InternalServerError" }
         "401": { $ref: "#/components/responses/Unauthorised" }
         "200": { $ref: "#/components/responses/RobotSessionsListOK" }
+
+  /robots/sessions/{session_id}/stream:
+    get:
+      operationId: RobotSessionStream
+      summary: Resume a Robot session stream
+      description: |
+        Locate the active or most recent resumable turn for a Robot session.
+        A session without a resumable turn returns no content.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotSessionIDParam"
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "200": { $ref: "#/components/responses/RobotSessionStreamFound" }
+        "204": { description: No resumable turn exists for this session. }
+
+  /robots/sessions/{session_id}/turns/{turn_id}:
+    get:
+      operationId: RobotSessionTurnGet
+      summary: Read a Robot session turn stream
+      description: |
+        Read persisted turn events after an offset, optionally attaching to the
+        live tail using Server-Sent Events.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotSessionIDParam"
+        - $ref: "#/components/parameters/RobotTurnIDParam"
+        - $ref: "#/components/parameters/RobotStreamOffsetQuery"
+        - $ref: "#/components/parameters/RobotStreamLiveQuery"
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "200": { $ref: "#/components/responses/RobotSessionTurnRead" }
+    head:
+      operationId: RobotSessionTurnHead
+      summary: Inspect a Robot session turn stream
+      description: |
+        Read the current stream offset and state without returning events.
+      tags: [robots]
+      parameters:
+        - $ref: "#/components/parameters/RobotSessionIDParam"
+        - $ref: "#/components/parameters/RobotTurnIDParam"
+        - $ref: "#/components/parameters/RobotStreamOffsetQuery"
+      responses:
+        default: { $ref: "#/components/responses/InternalServerError" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "200": { $ref: "#/components/responses/RobotSessionTurnMetadata" }
 
   /robots/sessions/{session_id}:
     get:
@@ -4962,6 +5119,14 @@ components:
       schema:
         $ref: "#/components/schemas/Identifier"
 
+    RobotToolsetIDParam:
+      description: Robot Toolset ID
+      in: path
+      name: toolset_id
+      required: true
+      schema:
+        type: string
+
     RobotModelProviderParam:
       description: Robot model provider namespace
       in: path
@@ -4985,6 +5150,31 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/Identifier"
+
+    RobotTurnIDParam:
+      description: Robot turn ID
+      in: path
+      name: turn_id
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+
+    RobotStreamOffsetQuery:
+      description: |
+        Read events after this stream offset. Use `-1` to start at beginning.
+      in: query
+      name: offset
+      schema:
+        type: string
+        default: "-1"
+
+    RobotStreamLiveQuery:
+      description: Attach to the live stream tail after catching up.
+      in: query
+      name: live
+      schema:
+        type: string
+        enum: [sse]
 
     RobotWorkspaceIDParam:
       description: Robot workspace ID
@@ -5447,7 +5637,20 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/RobotInitialProps" }
 
+    RobotToolsetCreate:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotToolsetInitialProps" }
+
+    RobotToolsetUpdate:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotToolsetMutableProps" }
+
     RobotChatStart:
+      required: true
       content:
         application/json:
           schema: { $ref: "#/components/schemas/RobotChatRequest" }
@@ -6244,10 +6447,12 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            required: [collections]
-            properties:
-              collections: { $ref: "#/components/schemas/CollectionList" }
+            allOf:
+              - $ref: "#/components/schemas/PaginatedResult"
+              - type: object
+                required: [collections]
+                properties:
+                  collections: { $ref: "#/components/schemas/CollectionList" }
 
     CollectionGetOK:
       description: Collection information and content.
@@ -6503,12 +6708,60 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/RobotToolListResult" }
 
-    RobotChatStream:
-      description: Server-sent events stream of robot chat responses.
+    RobotToolsetsListOK:
+      description: Robot Toolsets retrieved.
       content:
-        text/event-stream:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotToolsetListResult" }
+
+    RobotToolsetGetOK:
+      description: Robot Toolset retrieved.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotToolset" }
+
+    RobotSessionStreamCreated:
+      description: Robot turn started.
+      headers:
+        Location:
+          description: Relative URL of the turn stream.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotSessionStreamReference" }
+
+    RobotSessionStreamFound:
+      description: Resumable Robot turn stream located.
+      headers:
+        Location:
+          description: Relative URL of the turn stream.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/RobotSessionStreamReference" }
+
+    RobotSessionTurnRead:
+      description: |
+        Persisted Robot turn events, optionally followed by a live SSE tail.
+      headers:
+        Stream-Next-Offset: { $ref: "#/components/headers/Stream-Next-Offset" }
+        Stream-Up-To-Date: { $ref: "#/components/headers/Stream-Up-To-Date" }
+        Stream-Closed: { $ref: "#/components/headers/Stream-Closed" }
+        Stream-Cursor: { $ref: "#/components/headers/Stream-Cursor" }
+      content:
+        application/json:
           schema:
-            $ref: "#/components/schemas/StreamPart"
+            type: array
+            items: { $ref: "#/components/schemas/StreamPart" }
+        text/event-stream:
+          schema: { type: string }
+
+    RobotSessionTurnMetadata:
+      description: Current Robot turn stream state.
+      headers:
+        Stream-Next-Offset: { $ref: "#/components/headers/Stream-Next-Offset" }
+        Stream-Up-To-Date: { $ref: "#/components/headers/Stream-Up-To-Date" }
+        Stream-Closed: { $ref: "#/components/headers/Stream-Closed" }
 
     RobotProvidersListOK:
       description: Robot providers retrieved.
@@ -6634,10 +6887,6 @@ components:
     Cache-Control:
       schema:
         type: string
-    Last-Modified:
-      schema:
-        type: string
-        format: RFC1123
     ETag:
       schema:
         type: string
@@ -6648,6 +6897,19 @@ components:
         pointer per RFC 9728.
       schema:
         type: string
+    Stream-Next-Offset:
+      description: Offset to use for the next read.
+      required: true
+      schema: { type: string }
+    Stream-Up-To-Date:
+      description: Whether the response has caught up to current stream tail.
+      schema: { type: boolean }
+    Stream-Closed:
+      description: Whether the turn stream has completed permanently.
+      schema: { type: boolean }
+    Stream-Cursor:
+      description: Cursor identifying a live stream attachment.
+      schema: { type: string }
 
   schemas:
     #
@@ -6675,9 +6937,8 @@ components:
       description: A unique identifier for this resource.
 
     NullableIdentifier:
-      type: string
+      type: [string, "null"]
       format: xid
-      nullable: true
       example: "cc5lnd2s1s4652adtu50"
       description: A unique identifier for this resource.
 
@@ -8950,10 +9211,12 @@ components:
       items: { $ref: "#/components/schemas/OAuthRefreshToken" }
 
     OAuthRefreshTokenListResult:
-      type: object
-      required: [tokens]
-      properties:
-        tokens: { $ref: "#/components/schemas/OAuthRefreshTokenList" }
+      allOf:
+        - $ref: "#/components/schemas/PaginatedResult"
+        - type: object
+          required: [tokens]
+          properties:
+            tokens: { $ref: "#/components/schemas/OAuthRefreshTokenList" }
 
     WebAuthnPublicKeyCreationOptions:
       description: |
@@ -10059,7 +10322,6 @@ components:
         cover_image_asset_id:
           allOf:
             - $ref: "#/components/schemas/NullableIdentifier"
-          nullable: true
           description: Optional cover image asset identifier for the category.
         meta: { $ref: "#/components/schemas/Metadata" }
 
@@ -10196,10 +10458,12 @@ components:
       items: { $ref: "#/components/schemas/Identifier" }
 
     TagListResult:
-      type: object
-      required: [tags]
-      properties:
-        tags: { $ref: "#/components/schemas/TagReferenceList" }
+      allOf:
+        - $ref: "#/components/schemas/PaginatedResult"
+        - type: object
+          required: [tags]
+          properties:
+            tags: { $ref: "#/components/schemas/TagReferenceList" }
 
     #
     # 8888888b.                   888
@@ -10916,9 +11180,8 @@ components:
         asset_ids: { $ref: "#/components/schemas/AssetIDs" }
         asset_sources: { $ref: "#/components/schemas/AssetSourceList" }
         url:
-          type: string
+          type: [string, "null"]
           format: url
-          nullable: true
         description: { $ref: "#/components/schemas/NodeDescription" }
         primary_image_asset_id:
           { $ref: "#/components/schemas/NullableIdentifier" }
@@ -10963,11 +11226,9 @@ components:
         name: { $ref: "#/components/schemas/NodeName" }
         slug: { $ref: "#/components/schemas/NodeSlug" }
         description:
-          allOf: [{ $ref: "#/components/schemas/NodeDescription" }]
-          nullable: true
+          type: [string, "null"]
         content:
-          allOf: [{ $ref: "#/components/schemas/PostContent" }]
-          nullable: true
+          type: [string, "null"]
         properties:
           description: |
             Complete desired-state property list for the target node.
@@ -11047,11 +11308,9 @@ components:
         name: { $ref: "#/components/schemas/NodeName" }
         slug: { $ref: "#/components/schemas/NodeSlug" }
         description:
-          allOf: [{ $ref: "#/components/schemas/NodeDescription" }]
-          nullable: true
+          type: [string, "null"]
         content:
-          allOf: [{ $ref: "#/components/schemas/PostContent" }]
-          nullable: true
+          type: [string, "null"]
         properties: { $ref: "#/components/schemas/PropertyMutationList" }
         meta: { $ref: "#/components/schemas/Metadata" }
 
@@ -11066,11 +11325,9 @@ components:
         name: { $ref: "#/components/schemas/NodeName" }
         slug: { $ref: "#/components/schemas/NodeSlug" }
         description:
-          allOf: [{ $ref: "#/components/schemas/NodeDescription" }]
-          nullable: true
+          type: [string, "null"]
         content:
-          allOf: [{ $ref: "#/components/schemas/PostContent" }]
-          nullable: true
+          type: [string, "null"]
         properties: { $ref: "#/components/schemas/PropertyMutationList" }
         meta: { $ref: "#/components/schemas/Metadata" }
 
@@ -11237,8 +11494,7 @@ components:
         properties is not allowed.
       properties:
         parent:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: |
             Optional new parent node slug. Set to null to move node to the root.
         before:
@@ -11707,7 +11963,7 @@ components:
 
     RobotProps:
       type: object
-      required: [name, description, playbook, model, author, tools]
+      required: [name, description, playbook, model, author, tools, toolsets]
       properties:
         name:
           type: string
@@ -11723,10 +11979,10 @@ components:
         workspace_id:
           allOf:
             - $ref: "#/components/schemas/NullableIdentifier"
-          nullable: true
           description: Optional default workspace template for this robot.
         author: { $ref: "#/components/schemas/ProfileReference" }
         tools: { $ref: "#/components/schemas/RobotToolNameList" }
+        toolsets: { $ref: "#/components/schemas/RobotToolsetRefList" }
         meta: { $ref: "#/components/schemas/Metadata" }
 
     RobotWorkspaceProvider:
@@ -11831,9 +12087,9 @@ components:
       required: [message_list]
       properties:
         message_list: { $ref: "#/components/schemas/PaginatedRobotMessageList" }
-        active_robot_id:
+        root_robot_id:
           type: string
-          description: Most recently active Robot ID for this session, including built-in Robot IDs.
+          description: Root Robot selected when this session was created, including built-in Robot IDs.
         active_workspace:
           $ref: "#/components/schemas/RobotWorkspaceMount"
 
@@ -11885,22 +12141,17 @@ components:
         - $ref: "#/components/schemas/ToolUIPart"
         - $ref: "#/components/schemas/FileUIPart"
         - $ref: "#/components/schemas/DataPart"
-      discriminator:
-        propertyName: type
-        mapping:
-          text: "#/components/schemas/TextUIPart"
-          reasoning: "#/components/schemas/ReasoningUIPart"
-          "dynamic-tool": "#/components/schemas/ToolUIPart"
-          file: "#/components/schemas/FileUIPart"
-          "data-render_card": "#/components/schemas/DataPart"
       description: |
         A part of a UIMessage. Can be text, reasoning, tool invocation, file, or custom data.
       required: [type]
       properties:
         type:
-          type: string
+          $ref: "#/components/schemas/UIMessagePartType"
           description: The type of the message part
-          enum: [text, reasoning, dynamic-tool, file, data-render_card]
+
+    UIMessagePartType:
+      type: string
+      description: Message-part type, including statically named `tool-*` parts.
 
     TextUIPart:
       type: object
@@ -11959,8 +12210,8 @@ components:
       properties:
         type:
           type: string
-          enum: [dynamic-tool]
-          description: Type identifier for dynamic tool calls
+          pattern: "^(dynamic-tool|tool-.+)$"
+          description: Dynamic or statically named tool-call type identifier
         toolCallId:
           type: string
           description: Unique ID for this tool call
@@ -12123,6 +12374,12 @@ components:
             author:
               $ref: "#/components/schemas/ProfileReference"
               description: Human author of the message
+            branch:
+              type: string
+              description: ADK execution branch. Delegated Robot events use a child branch.
+            isolation_scope:
+              type: string
+              description: ADK isolation scope for delegated task context.
 
     RobotSessionMessageList:
       type: array
@@ -12141,10 +12398,74 @@ components:
         messages: { $ref: "#/components/schemas/RobotSessionMessageList" }
 
     RobotToolNameList:
-      description: A list of tool names that the robot can use.
+      description: A list of raw tool names contained by a Toolset.
       type: array
       items:
         type: string
+
+    RobotToolsetRefList:
+      description: Reusable Toolset IDs assigned to a Robot.
+      type: array
+      items:
+        type: string
+
+    RobotToolsetSource:
+      type: string
+      enum: [system, custom, plugin]
+
+    RobotToolset:
+      type: object
+      required:
+        [
+          id,
+          name,
+          description,
+          instruction,
+          tools,
+          source,
+          editable,
+          usage_count,
+          requires_workspace,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        instruction:
+          type: string
+          description: Specialist instructions injected whenever the Toolset is active.
+        tools:
+          $ref: "#/components/schemas/RobotToolNameList"
+        source:
+          $ref: "#/components/schemas/RobotToolsetSource"
+        source_ref:
+          type: string
+          description: Optional provider-specific source identifier.
+        editable:
+          type: boolean
+        usage_count:
+          type: integer
+          minimum: 0
+        requires_workspace:
+          type: boolean
+          description: Whether this Toolset is only available to Robot sessions with an active workspace.
+        author:
+          $ref: "#/components/schemas/ProfileReference"
+        meta:
+          $ref: "#/components/schemas/Metadata"
+
+    RobotToolsetList:
+      type: array
+      items: { $ref: "#/components/schemas/RobotToolset" }
+
+    RobotToolsetListResult:
+      type: object
+      required: [toolsets]
+      properties:
+        toolsets: { $ref: "#/components/schemas/RobotToolsetList" }
 
     RobotToolSource:
       type: string
@@ -12159,6 +12480,7 @@ components:
         - available
         - description
         - requires_confirmation
+        - requires_workspace
       properties:
         id:
           type: string
@@ -12179,6 +12501,9 @@ components:
         requires_confirmation:
           type: boolean
           description: Whether Robot runs must pause for human approval before executing this tool.
+        requires_workspace:
+          type: boolean
+          description: Whether this tool is only available to Robot sessions with an active workspace.
 
     RobotToolInfoList:
       type: array
@@ -12517,6 +12842,8 @@ components:
           $ref: "#/components/schemas/Identifier"
         tools:
           $ref: "#/components/schemas/RobotToolNameList"
+        toolsets:
+          $ref: "#/components/schemas/RobotToolsetRefList"
         meta: { $ref: "#/components/schemas/Metadata" }
 
     RobotMutableProps:
@@ -12536,10 +12863,41 @@ components:
         workspace_id:
           allOf:
             - $ref: "#/components/schemas/NullableIdentifier"
-          nullable: true
         tools:
           $ref: "#/components/schemas/RobotToolNameList"
+        toolsets:
+          $ref: "#/components/schemas/RobotToolsetRefList"
         meta: { $ref: "#/components/schemas/Metadata" }
+
+    RobotToolsetInitialProps:
+      type: object
+      required: [name, description, tools]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instruction:
+          type: string
+          description: Specialist instructions injected whenever the Toolset is active.
+        tools:
+          $ref: "#/components/schemas/RobotToolNameList"
+        meta:
+          $ref: "#/components/schemas/Metadata"
+
+    RobotToolsetMutableProps:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instruction:
+          type: string
+        tools:
+          $ref: "#/components/schemas/RobotToolNameList"
+        meta:
+          $ref: "#/components/schemas/Metadata"
 
     RobotWorkspaceInitialProps:
       type: object
@@ -12606,12 +12964,17 @@ components:
           description: Session ID to continue an existing conversation
         robotId:
           type: string
-          description: Specific robot ID to use for this message
+          description: |
+            Optional Robot ID to use as the root when creating a new session.
+            Omit this field to use Denbot. It cannot switch the root
+            Robot of an existing session.
         messages:
           type: array
           description: Array of chat messages in the conversation
           items:
-            $ref: "#/components/schemas/UIMessage"
+            type: object
+            additionalProperties: true
+            x-go-type: UIMessage
         data:
           type: object
           description: Additional data for the chat request
@@ -12711,6 +13074,14 @@ components:
           required: [sessions]
           properties:
             sessions: { $ref: "#/components/schemas/RobotSessionList" }
+
+    RobotSessionStreamReference:
+      type: object
+      required: [streamUrl]
+      properties:
+        streamUrl:
+          type: string
+          description: Relative URL of the Robot turn stream.
 
     # -
     # Vercel Streaming Protocol

@@ -166,6 +166,9 @@ func (Account) Edges() []ent.Edge {
 		edge.To("robots", Robot.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
+		edge.To("robot_toolsets", RobotToolset.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
 		edge.To("robot_workspaces", RobotWorkspace.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
@@ -175,10 +178,16 @@ func (Account) Edges() []ent.Edge {
 		edge.To("robot_mcp_servers", RobotMCPServer.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
-		edge.To("robot_sessions", RobotSession.Type).
+		edge.To("created_robot_sessions", RobotSession.Type).
+			Annotations(entsql.OnDelete(entsql.Restrict)),
+
+		edge.To("robot_session_views", RobotSessionView.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
 		edge.To("robot_messages", RobotSessionMessage.Type).
+			Annotations(entsql.OnDelete(entsql.SetNull)),
+
+		edge.To("initiated_robot_turns", RobotSessionTurn.Type).
 			Annotations(entsql.OnDelete(entsql.SetNull)),
 	}
 }

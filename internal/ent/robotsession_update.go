@@ -15,6 +15,8 @@ import (
 	"github.com/Southclaws/storyden/internal/ent/predicate"
 	"github.com/Southclaws/storyden/internal/ent/robotsession"
 	"github.com/Southclaws/storyden/internal/ent/robotsessionmessage"
+	"github.com/Southclaws/storyden/internal/ent/robotsessionturn"
+	"github.com/Southclaws/storyden/internal/ent/robotsessionview"
 	"github.com/rs/xid"
 )
 
@@ -78,15 +80,146 @@ func (_u *RobotSessionUpdate) ClearState() *RobotSessionUpdate {
 	return _u
 }
 
-// SetUserID sets the "user" edge to the Account entity by ID.
-func (_u *RobotSessionUpdate) SetUserID(id xid.ID) *RobotSessionUpdate {
-	_u.mutation.SetUserID(id)
+// SetExecutionStatus sets the "execution_status" field.
+func (_u *RobotSessionUpdate) SetExecutionStatus(v robotsession.ExecutionStatus) *RobotSessionUpdate {
+	_u.mutation.SetExecutionStatus(v)
 	return _u
 }
 
-// SetUser sets the "user" edge to the Account entity.
-func (_u *RobotSessionUpdate) SetUser(v *Account) *RobotSessionUpdate {
-	return _u.SetUserID(v.ID)
+// SetNillableExecutionStatus sets the "execution_status" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableExecutionStatus(v *robotsession.ExecutionStatus) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetExecutionStatus(*v)
+	}
+	return _u
+}
+
+// SetActiveTurnID sets the "active_turn_id" field.
+func (_u *RobotSessionUpdate) SetActiveTurnID(v xid.ID) *RobotSessionUpdate {
+	_u.mutation.SetActiveTurnID(v)
+	return _u
+}
+
+// SetNillableActiveTurnID sets the "active_turn_id" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableActiveTurnID(v *xid.ID) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetActiveTurnID(*v)
+	}
+	return _u
+}
+
+// ClearActiveTurnID clears the value of the "active_turn_id" field.
+func (_u *RobotSessionUpdate) ClearActiveTurnID() *RobotSessionUpdate {
+	_u.mutation.ClearActiveTurnID()
+	return _u
+}
+
+// SetLeaseToken sets the "lease_token" field.
+func (_u *RobotSessionUpdate) SetLeaseToken(v string) *RobotSessionUpdate {
+	_u.mutation.SetLeaseToken(v)
+	return _u
+}
+
+// SetNillableLeaseToken sets the "lease_token" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableLeaseToken(v *string) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetLeaseToken(*v)
+	}
+	return _u
+}
+
+// ClearLeaseToken clears the value of the "lease_token" field.
+func (_u *RobotSessionUpdate) ClearLeaseToken() *RobotSessionUpdate {
+	_u.mutation.ClearLeaseToken()
+	return _u
+}
+
+// SetLeaseGeneration sets the "lease_generation" field.
+func (_u *RobotSessionUpdate) SetLeaseGeneration(v uint64) *RobotSessionUpdate {
+	_u.mutation.ResetLeaseGeneration()
+	_u.mutation.SetLeaseGeneration(v)
+	return _u
+}
+
+// SetNillableLeaseGeneration sets the "lease_generation" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableLeaseGeneration(v *uint64) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetLeaseGeneration(*v)
+	}
+	return _u
+}
+
+// AddLeaseGeneration adds value to the "lease_generation" field.
+func (_u *RobotSessionUpdate) AddLeaseGeneration(v int64) *RobotSessionUpdate {
+	_u.mutation.AddLeaseGeneration(v)
+	return _u
+}
+
+// SetNextEventSequence sets the "next_event_sequence" field.
+func (_u *RobotSessionUpdate) SetNextEventSequence(v uint64) *RobotSessionUpdate {
+	_u.mutation.ResetNextEventSequence()
+	_u.mutation.SetNextEventSequence(v)
+	return _u
+}
+
+// SetNillableNextEventSequence sets the "next_event_sequence" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableNextEventSequence(v *uint64) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetNextEventSequence(*v)
+	}
+	return _u
+}
+
+// AddNextEventSequence adds value to the "next_event_sequence" field.
+func (_u *RobotSessionUpdate) AddNextEventSequence(v int64) *RobotSessionUpdate {
+	_u.mutation.AddNextEventSequence(v)
+	return _u
+}
+
+// SetLeaseExpiresAt sets the "lease_expires_at" field.
+func (_u *RobotSessionUpdate) SetLeaseExpiresAt(v time.Time) *RobotSessionUpdate {
+	_u.mutation.SetLeaseExpiresAt(v)
+	return _u
+}
+
+// SetNillableLeaseExpiresAt sets the "lease_expires_at" field if the given value is not nil.
+func (_u *RobotSessionUpdate) SetNillableLeaseExpiresAt(v *time.Time) *RobotSessionUpdate {
+	if v != nil {
+		_u.SetLeaseExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearLeaseExpiresAt clears the value of the "lease_expires_at" field.
+func (_u *RobotSessionUpdate) ClearLeaseExpiresAt() *RobotSessionUpdate {
+	_u.mutation.ClearLeaseExpiresAt()
+	return _u
+}
+
+// SetCreatorID sets the "creator" edge to the Account entity by ID.
+func (_u *RobotSessionUpdate) SetCreatorID(id xid.ID) *RobotSessionUpdate {
+	_u.mutation.SetCreatorID(id)
+	return _u
+}
+
+// SetCreator sets the "creator" edge to the Account entity.
+func (_u *RobotSessionUpdate) SetCreator(v *Account) *RobotSessionUpdate {
+	return _u.SetCreatorID(v.ID)
+}
+
+// AddViewIDs adds the "views" edge to the RobotSessionView entity by IDs.
+func (_u *RobotSessionUpdate) AddViewIDs(ids ...xid.ID) *RobotSessionUpdate {
+	_u.mutation.AddViewIDs(ids...)
+	return _u
+}
+
+// AddViews adds the "views" edges to the RobotSessionView entity.
+func (_u *RobotSessionUpdate) AddViews(v ...*RobotSessionView) *RobotSessionUpdate {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddViewIDs(ids...)
 }
 
 // AddMessageIDs adds the "messages" edge to the RobotSessionMessage entity by IDs.
@@ -104,15 +237,51 @@ func (_u *RobotSessionUpdate) AddMessages(v ...*RobotSessionMessage) *RobotSessi
 	return _u.AddMessageIDs(ids...)
 }
 
+// AddTurnIDs adds the "turns" edge to the RobotSessionTurn entity by IDs.
+func (_u *RobotSessionUpdate) AddTurnIDs(ids ...xid.ID) *RobotSessionUpdate {
+	_u.mutation.AddTurnIDs(ids...)
+	return _u
+}
+
+// AddTurns adds the "turns" edges to the RobotSessionTurn entity.
+func (_u *RobotSessionUpdate) AddTurns(v ...*RobotSessionTurn) *RobotSessionUpdate {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddTurnIDs(ids...)
+}
+
 // Mutation returns the RobotSessionMutation object of the builder.
 func (_u *RobotSessionUpdate) Mutation() *RobotSessionMutation {
 	return _u.mutation
 }
 
-// ClearUser clears the "user" edge to the Account entity.
-func (_u *RobotSessionUpdate) ClearUser() *RobotSessionUpdate {
-	_u.mutation.ClearUser()
+// ClearCreator clears the "creator" edge to the Account entity.
+func (_u *RobotSessionUpdate) ClearCreator() *RobotSessionUpdate {
+	_u.mutation.ClearCreator()
 	return _u
+}
+
+// ClearViews clears all "views" edges to the RobotSessionView entity.
+func (_u *RobotSessionUpdate) ClearViews() *RobotSessionUpdate {
+	_u.mutation.ClearViews()
+	return _u
+}
+
+// RemoveViewIDs removes the "views" edge to RobotSessionView entities by IDs.
+func (_u *RobotSessionUpdate) RemoveViewIDs(ids ...xid.ID) *RobotSessionUpdate {
+	_u.mutation.RemoveViewIDs(ids...)
+	return _u
+}
+
+// RemoveViews removes "views" edges to RobotSessionView entities.
+func (_u *RobotSessionUpdate) RemoveViews(v ...*RobotSessionView) *RobotSessionUpdate {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveViewIDs(ids...)
 }
 
 // ClearMessages clears all "messages" edges to the RobotSessionMessage entity.
@@ -134,6 +303,27 @@ func (_u *RobotSessionUpdate) RemoveMessages(v ...*RobotSessionMessage) *RobotSe
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveMessageIDs(ids...)
+}
+
+// ClearTurns clears all "turns" edges to the RobotSessionTurn entity.
+func (_u *RobotSessionUpdate) ClearTurns() *RobotSessionUpdate {
+	_u.mutation.ClearTurns()
+	return _u
+}
+
+// RemoveTurnIDs removes the "turns" edge to RobotSessionTurn entities by IDs.
+func (_u *RobotSessionUpdate) RemoveTurnIDs(ids ...xid.ID) *RobotSessionUpdate {
+	_u.mutation.RemoveTurnIDs(ids...)
+	return _u
+}
+
+// RemoveTurns removes "turns" edges to RobotSessionTurn entities.
+func (_u *RobotSessionUpdate) RemoveTurns(v ...*RobotSessionTurn) *RobotSessionUpdate {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveTurnIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -174,8 +364,13 @@ func (_u *RobotSessionUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *RobotSessionUpdate) check() error {
-	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "RobotSession.user"`)
+	if v, ok := _u.mutation.ExecutionStatus(); ok {
+		if err := robotsession.ExecutionStatusValidator(v); err != nil {
+			return &ValidationError{Name: "execution_status", err: fmt.Errorf(`ent: validator failed for field "RobotSession.execution_status": %w`, err)}
+		}
+	}
+	if _u.mutation.CreatorCleared() && len(_u.mutation.CreatorIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "RobotSession.creator"`)
 	}
 	return nil
 }
@@ -210,12 +405,45 @@ func (_u *RobotSessionUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.StateCleared() {
 		_spec.ClearField(robotsession.FieldState, field.TypeJSON)
 	}
-	if _u.mutation.UserCleared() {
+	if value, ok := _u.mutation.ExecutionStatus(); ok {
+		_spec.SetField(robotsession.FieldExecutionStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.ActiveTurnID(); ok {
+		_spec.SetField(robotsession.FieldActiveTurnID, field.TypeString, value)
+	}
+	if _u.mutation.ActiveTurnIDCleared() {
+		_spec.ClearField(robotsession.FieldActiveTurnID, field.TypeString)
+	}
+	if value, ok := _u.mutation.LeaseToken(); ok {
+		_spec.SetField(robotsession.FieldLeaseToken, field.TypeString, value)
+	}
+	if _u.mutation.LeaseTokenCleared() {
+		_spec.ClearField(robotsession.FieldLeaseToken, field.TypeString)
+	}
+	if value, ok := _u.mutation.LeaseGeneration(); ok {
+		_spec.SetField(robotsession.FieldLeaseGeneration, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.AddedLeaseGeneration(); ok {
+		_spec.AddField(robotsession.FieldLeaseGeneration, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.NextEventSequence(); ok {
+		_spec.SetField(robotsession.FieldNextEventSequence, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.AddedNextEventSequence(); ok {
+		_spec.AddField(robotsession.FieldNextEventSequence, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.LeaseExpiresAt(); ok {
+		_spec.SetField(robotsession.FieldLeaseExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.LeaseExpiresAtCleared() {
+		_spec.ClearField(robotsession.FieldLeaseExpiresAt, field.TypeTime)
+	}
+	if _u.mutation.CreatorCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   robotsession.UserTable,
-			Columns: []string{robotsession.UserColumn},
+			Table:   robotsession.CreatorTable,
+			Columns: []string{robotsession.CreatorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeString),
@@ -223,15 +451,60 @@ func (_u *RobotSessionUpdate) sqlSave(ctx context.Context) (_node int, err error
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.UserIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.CreatorIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   robotsession.UserTable,
-			Columns: []string{robotsession.UserColumn},
+			Table:   robotsession.CreatorTable,
+			Columns: []string{robotsession.CreatorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ViewsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedViewsIDs(); len(nodes) > 0 && !_u.mutation.ViewsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ViewsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -277,6 +550,51 @@ func (_u *RobotSessionUpdate) sqlSave(ctx context.Context) (_node int, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(robotsessionmessage.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.TurnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedTurnsIDs(); len(nodes) > 0 && !_u.mutation.TurnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.TurnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -352,15 +670,146 @@ func (_u *RobotSessionUpdateOne) ClearState() *RobotSessionUpdateOne {
 	return _u
 }
 
-// SetUserID sets the "user" edge to the Account entity by ID.
-func (_u *RobotSessionUpdateOne) SetUserID(id xid.ID) *RobotSessionUpdateOne {
-	_u.mutation.SetUserID(id)
+// SetExecutionStatus sets the "execution_status" field.
+func (_u *RobotSessionUpdateOne) SetExecutionStatus(v robotsession.ExecutionStatus) *RobotSessionUpdateOne {
+	_u.mutation.SetExecutionStatus(v)
 	return _u
 }
 
-// SetUser sets the "user" edge to the Account entity.
-func (_u *RobotSessionUpdateOne) SetUser(v *Account) *RobotSessionUpdateOne {
-	return _u.SetUserID(v.ID)
+// SetNillableExecutionStatus sets the "execution_status" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableExecutionStatus(v *robotsession.ExecutionStatus) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetExecutionStatus(*v)
+	}
+	return _u
+}
+
+// SetActiveTurnID sets the "active_turn_id" field.
+func (_u *RobotSessionUpdateOne) SetActiveTurnID(v xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.SetActiveTurnID(v)
+	return _u
+}
+
+// SetNillableActiveTurnID sets the "active_turn_id" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableActiveTurnID(v *xid.ID) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetActiveTurnID(*v)
+	}
+	return _u
+}
+
+// ClearActiveTurnID clears the value of the "active_turn_id" field.
+func (_u *RobotSessionUpdateOne) ClearActiveTurnID() *RobotSessionUpdateOne {
+	_u.mutation.ClearActiveTurnID()
+	return _u
+}
+
+// SetLeaseToken sets the "lease_token" field.
+func (_u *RobotSessionUpdateOne) SetLeaseToken(v string) *RobotSessionUpdateOne {
+	_u.mutation.SetLeaseToken(v)
+	return _u
+}
+
+// SetNillableLeaseToken sets the "lease_token" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableLeaseToken(v *string) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetLeaseToken(*v)
+	}
+	return _u
+}
+
+// ClearLeaseToken clears the value of the "lease_token" field.
+func (_u *RobotSessionUpdateOne) ClearLeaseToken() *RobotSessionUpdateOne {
+	_u.mutation.ClearLeaseToken()
+	return _u
+}
+
+// SetLeaseGeneration sets the "lease_generation" field.
+func (_u *RobotSessionUpdateOne) SetLeaseGeneration(v uint64) *RobotSessionUpdateOne {
+	_u.mutation.ResetLeaseGeneration()
+	_u.mutation.SetLeaseGeneration(v)
+	return _u
+}
+
+// SetNillableLeaseGeneration sets the "lease_generation" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableLeaseGeneration(v *uint64) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetLeaseGeneration(*v)
+	}
+	return _u
+}
+
+// AddLeaseGeneration adds value to the "lease_generation" field.
+func (_u *RobotSessionUpdateOne) AddLeaseGeneration(v int64) *RobotSessionUpdateOne {
+	_u.mutation.AddLeaseGeneration(v)
+	return _u
+}
+
+// SetNextEventSequence sets the "next_event_sequence" field.
+func (_u *RobotSessionUpdateOne) SetNextEventSequence(v uint64) *RobotSessionUpdateOne {
+	_u.mutation.ResetNextEventSequence()
+	_u.mutation.SetNextEventSequence(v)
+	return _u
+}
+
+// SetNillableNextEventSequence sets the "next_event_sequence" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableNextEventSequence(v *uint64) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetNextEventSequence(*v)
+	}
+	return _u
+}
+
+// AddNextEventSequence adds value to the "next_event_sequence" field.
+func (_u *RobotSessionUpdateOne) AddNextEventSequence(v int64) *RobotSessionUpdateOne {
+	_u.mutation.AddNextEventSequence(v)
+	return _u
+}
+
+// SetLeaseExpiresAt sets the "lease_expires_at" field.
+func (_u *RobotSessionUpdateOne) SetLeaseExpiresAt(v time.Time) *RobotSessionUpdateOne {
+	_u.mutation.SetLeaseExpiresAt(v)
+	return _u
+}
+
+// SetNillableLeaseExpiresAt sets the "lease_expires_at" field if the given value is not nil.
+func (_u *RobotSessionUpdateOne) SetNillableLeaseExpiresAt(v *time.Time) *RobotSessionUpdateOne {
+	if v != nil {
+		_u.SetLeaseExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearLeaseExpiresAt clears the value of the "lease_expires_at" field.
+func (_u *RobotSessionUpdateOne) ClearLeaseExpiresAt() *RobotSessionUpdateOne {
+	_u.mutation.ClearLeaseExpiresAt()
+	return _u
+}
+
+// SetCreatorID sets the "creator" edge to the Account entity by ID.
+func (_u *RobotSessionUpdateOne) SetCreatorID(id xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.SetCreatorID(id)
+	return _u
+}
+
+// SetCreator sets the "creator" edge to the Account entity.
+func (_u *RobotSessionUpdateOne) SetCreator(v *Account) *RobotSessionUpdateOne {
+	return _u.SetCreatorID(v.ID)
+}
+
+// AddViewIDs adds the "views" edge to the RobotSessionView entity by IDs.
+func (_u *RobotSessionUpdateOne) AddViewIDs(ids ...xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.AddViewIDs(ids...)
+	return _u
+}
+
+// AddViews adds the "views" edges to the RobotSessionView entity.
+func (_u *RobotSessionUpdateOne) AddViews(v ...*RobotSessionView) *RobotSessionUpdateOne {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddViewIDs(ids...)
 }
 
 // AddMessageIDs adds the "messages" edge to the RobotSessionMessage entity by IDs.
@@ -378,15 +827,51 @@ func (_u *RobotSessionUpdateOne) AddMessages(v ...*RobotSessionMessage) *RobotSe
 	return _u.AddMessageIDs(ids...)
 }
 
+// AddTurnIDs adds the "turns" edge to the RobotSessionTurn entity by IDs.
+func (_u *RobotSessionUpdateOne) AddTurnIDs(ids ...xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.AddTurnIDs(ids...)
+	return _u
+}
+
+// AddTurns adds the "turns" edges to the RobotSessionTurn entity.
+func (_u *RobotSessionUpdateOne) AddTurns(v ...*RobotSessionTurn) *RobotSessionUpdateOne {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddTurnIDs(ids...)
+}
+
 // Mutation returns the RobotSessionMutation object of the builder.
 func (_u *RobotSessionUpdateOne) Mutation() *RobotSessionMutation {
 	return _u.mutation
 }
 
-// ClearUser clears the "user" edge to the Account entity.
-func (_u *RobotSessionUpdateOne) ClearUser() *RobotSessionUpdateOne {
-	_u.mutation.ClearUser()
+// ClearCreator clears the "creator" edge to the Account entity.
+func (_u *RobotSessionUpdateOne) ClearCreator() *RobotSessionUpdateOne {
+	_u.mutation.ClearCreator()
 	return _u
+}
+
+// ClearViews clears all "views" edges to the RobotSessionView entity.
+func (_u *RobotSessionUpdateOne) ClearViews() *RobotSessionUpdateOne {
+	_u.mutation.ClearViews()
+	return _u
+}
+
+// RemoveViewIDs removes the "views" edge to RobotSessionView entities by IDs.
+func (_u *RobotSessionUpdateOne) RemoveViewIDs(ids ...xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.RemoveViewIDs(ids...)
+	return _u
+}
+
+// RemoveViews removes "views" edges to RobotSessionView entities.
+func (_u *RobotSessionUpdateOne) RemoveViews(v ...*RobotSessionView) *RobotSessionUpdateOne {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveViewIDs(ids...)
 }
 
 // ClearMessages clears all "messages" edges to the RobotSessionMessage entity.
@@ -408,6 +893,27 @@ func (_u *RobotSessionUpdateOne) RemoveMessages(v ...*RobotSessionMessage) *Robo
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveMessageIDs(ids...)
+}
+
+// ClearTurns clears all "turns" edges to the RobotSessionTurn entity.
+func (_u *RobotSessionUpdateOne) ClearTurns() *RobotSessionUpdateOne {
+	_u.mutation.ClearTurns()
+	return _u
+}
+
+// RemoveTurnIDs removes the "turns" edge to RobotSessionTurn entities by IDs.
+func (_u *RobotSessionUpdateOne) RemoveTurnIDs(ids ...xid.ID) *RobotSessionUpdateOne {
+	_u.mutation.RemoveTurnIDs(ids...)
+	return _u
+}
+
+// RemoveTurns removes "turns" edges to RobotSessionTurn entities.
+func (_u *RobotSessionUpdateOne) RemoveTurns(v ...*RobotSessionTurn) *RobotSessionUpdateOne {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveTurnIDs(ids...)
 }
 
 // Where appends a list predicates to the RobotSessionUpdate builder.
@@ -461,8 +967,13 @@ func (_u *RobotSessionUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *RobotSessionUpdateOne) check() error {
-	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "RobotSession.user"`)
+	if v, ok := _u.mutation.ExecutionStatus(); ok {
+		if err := robotsession.ExecutionStatusValidator(v); err != nil {
+			return &ValidationError{Name: "execution_status", err: fmt.Errorf(`ent: validator failed for field "RobotSession.execution_status": %w`, err)}
+		}
+	}
+	if _u.mutation.CreatorCleared() && len(_u.mutation.CreatorIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "RobotSession.creator"`)
 	}
 	return nil
 }
@@ -514,12 +1025,45 @@ func (_u *RobotSessionUpdateOne) sqlSave(ctx context.Context) (_node *RobotSessi
 	if _u.mutation.StateCleared() {
 		_spec.ClearField(robotsession.FieldState, field.TypeJSON)
 	}
-	if _u.mutation.UserCleared() {
+	if value, ok := _u.mutation.ExecutionStatus(); ok {
+		_spec.SetField(robotsession.FieldExecutionStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.ActiveTurnID(); ok {
+		_spec.SetField(robotsession.FieldActiveTurnID, field.TypeString, value)
+	}
+	if _u.mutation.ActiveTurnIDCleared() {
+		_spec.ClearField(robotsession.FieldActiveTurnID, field.TypeString)
+	}
+	if value, ok := _u.mutation.LeaseToken(); ok {
+		_spec.SetField(robotsession.FieldLeaseToken, field.TypeString, value)
+	}
+	if _u.mutation.LeaseTokenCleared() {
+		_spec.ClearField(robotsession.FieldLeaseToken, field.TypeString)
+	}
+	if value, ok := _u.mutation.LeaseGeneration(); ok {
+		_spec.SetField(robotsession.FieldLeaseGeneration, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.AddedLeaseGeneration(); ok {
+		_spec.AddField(robotsession.FieldLeaseGeneration, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.NextEventSequence(); ok {
+		_spec.SetField(robotsession.FieldNextEventSequence, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.AddedNextEventSequence(); ok {
+		_spec.AddField(robotsession.FieldNextEventSequence, field.TypeUint64, value)
+	}
+	if value, ok := _u.mutation.LeaseExpiresAt(); ok {
+		_spec.SetField(robotsession.FieldLeaseExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.LeaseExpiresAtCleared() {
+		_spec.ClearField(robotsession.FieldLeaseExpiresAt, field.TypeTime)
+	}
+	if _u.mutation.CreatorCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   robotsession.UserTable,
-			Columns: []string{robotsession.UserColumn},
+			Table:   robotsession.CreatorTable,
+			Columns: []string{robotsession.CreatorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeString),
@@ -527,15 +1071,60 @@ func (_u *RobotSessionUpdateOne) sqlSave(ctx context.Context) (_node *RobotSessi
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.UserIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.CreatorIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
-			Table:   robotsession.UserTable,
-			Columns: []string{robotsession.UserColumn},
+			Table:   robotsession.CreatorTable,
+			Columns: []string{robotsession.CreatorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(account.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ViewsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedViewsIDs(); len(nodes) > 0 && !_u.mutation.ViewsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ViewsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.ViewsTable,
+			Columns: []string{robotsession.ViewsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionview.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -581,6 +1170,51 @@ func (_u *RobotSessionUpdateOne) sqlSave(ctx context.Context) (_node *RobotSessi
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(robotsessionmessage.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.TurnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedTurnsIDs(); len(nodes) > 0 && !_u.mutation.TurnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.TurnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsession.TurnsTable,
+			Columns: []string{robotsession.TurnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessionturn.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
