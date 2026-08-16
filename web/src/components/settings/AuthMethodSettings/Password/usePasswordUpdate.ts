@@ -5,13 +5,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-import { useAccountGet } from "src/api/openapi-client/accounts";
-import { authPasswordUpdate } from "src/api/openapi-client/auth";
-import { APIError } from "src/api/openapi-schema";
-import { deriveError } from "src/utils/error";
-
 import { handle } from "@/api/client";
+import { useAccountGet } from "@/api/openapi-client/accounts";
+import { authPasswordUpdate } from "@/api/openapi-client/auth";
+import { APIError } from "@/api/openapi-schema";
 import { ExistingPasswordSchema, PasswordSchema } from "@/lib/auth/schemas";
+import { deriveError } from "@/utils/error";
 
 const FormSchema = z.object({
   old: ExistingPasswordSchema,

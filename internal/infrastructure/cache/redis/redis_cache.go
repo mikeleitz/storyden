@@ -11,13 +11,7 @@ import (
 var errNotFound = fmt.Errorf("not found")
 
 type RedisCache struct {
-	client  rueidis.Client
-	options Options
-}
-
-type Options struct {
-	Expiration                time.Duration
-	ClientSideCacheExpiration time.Duration
+	client rueidis.Client
 }
 
 func New(client rueidis.Client) *RedisCache {
@@ -25,8 +19,8 @@ func New(client rueidis.Client) *RedisCache {
 }
 
 func (c *RedisCache) Get(ctx context.Context, key string) (string, error) {
-	cmd := c.client.B().Get().Key(key).Cache()
-	res := c.client.DoCache(ctx, cmd, c.options.ClientSideCacheExpiration)
+	cmd := c.client.B().Get().Key(key).Build()
+	res := c.client.Do(ctx, cmd)
 
 	str, err := res.ToString()
 	if rueidis.IsRedisNil(err) {
@@ -47,6 +41,26 @@ func (c *RedisCache) Set(ctx context.Context, key string, value string, ttl time
 	err := c.client.Do(ctx, cmd).Error()
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (c *RedisCache) SetMany(ctx context.Context, values map[string]string, ttl time.Duration) error {
+	commands := make(rueidis.Commands, 0, len(values))
+	for key, value := range values {
+		commands = append(commands, c.client.B().
+			Set().
+			Key(key).
+			Value(value).
+			Ex(ttl).
+			Build())
+	}
+
+	for _, result := range c.client.DoMulti(ctx, commands...) {
+		if err := result.Error(); err != nil {
+			return err
+		}
 	}
 
 	return nil

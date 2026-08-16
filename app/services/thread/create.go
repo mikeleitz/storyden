@@ -7,6 +7,7 @@ import (
 	"github.com/Southclaws/fault"
 	"github.com/Southclaws/fault/fctx"
 	"github.com/Southclaws/fault/fmsg"
+	"github.com/Southclaws/opt"
 	"github.com/rs/xid"
 
 	"github.com/Southclaws/storyden/app/resources/account"
@@ -17,7 +18,6 @@ import (
 	"github.com/Southclaws/storyden/app/resources/tag/tag_ref"
 	"github.com/Southclaws/storyden/app/resources/visibility"
 	"github.com/Southclaws/storyden/app/services/authentication/session"
-	"github.com/Southclaws/storyden/app/services/link/fetcher"
 	"github.com/Southclaws/storyden/app/services/moderation/checker"
 	"github.com/Southclaws/storyden/lib/plugin/rpc"
 )
@@ -30,6 +30,14 @@ func (s *service) Create(ctx context.Context,
 ) (*thread.Thread, error) {
 	if err := authoriseMutation(ctx, partial); err != nil {
 		return nil, err
+	}
+
+	if content, ok := partial.Content.Get(); ok {
+		stable, err := datagraph.NewRichTextWithNewBlocks(content)
+		if err != nil {
+			return nil, fault.Wrap(err, fctx.With(ctx))
+		}
+		partial.Content = opt.New(stable.Content)
 	}
 
 	opts := partial.Opts()
@@ -45,7 +53,7 @@ func (s *service) Create(ctx context.Context,
 	}
 
 	if u, ok := partial.URL.Get(); ok {
-		ln, err := s.fetcher.Fetch(ctx, u, fetcher.Options{})
+		ln, err := s.fetcher.Fetch(ctx, u)
 		if err == nil {
 			opts = append(opts, thread_writer.WithLink(xid.ID(ln.ID)))
 		}

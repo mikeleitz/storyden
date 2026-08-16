@@ -1,0 +1,14 @@
+steps:
+  - match:
+      tool_result: robot_get
+    respond:
+      text: "The tool returned an error."
+      finish: "stop"
+  - match:
+      any: true
+    respond:
+      tool_calls:
+        - id: call_err_1
+          name: robot_get
+          args:
+            id: "not-a-robot-id"

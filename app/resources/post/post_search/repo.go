@@ -2,6 +2,7 @@ package post_search
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Southclaws/dt"
 	"github.com/rs/xid"
@@ -18,7 +19,7 @@ import (
 	ent_tag "github.com/Southclaws/storyden/internal/ent/tag"
 )
 
-//go:generate go run -mod=mod github.com/Southclaws/enumerator
+//go:generate go run github.com/Southclaws/enumerator
 
 type kindEnum string
 
@@ -58,6 +59,9 @@ func WithKinds(ks ...Kind) Filter {
 
 func WithKeywords(q string) Filter {
 	return func(pq *ent.PostQuery) {
+		if strings.TrimSpace(q) == "" {
+			return
+		}
 		pq.Where(
 			ent_post.Or(
 				ent_post.And(
@@ -65,7 +69,8 @@ func WithKeywords(q string) Filter {
 					ent_post.TitleContainsFold(q),
 				),
 				ent_post.BodyContainsFold(q),
-			))
+			),
+		)
 	}
 }
 

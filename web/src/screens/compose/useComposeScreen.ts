@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { threadGet } from "src/api/openapi-client/threads";
-import { Thread } from "src/api/openapi-schema";
-
 import { handle } from "@/api/client";
+import { threadGet } from "@/api/openapi-client/threads";
+import { Thread } from "@/api/openapi-schema";
 
 export type Props = { editing?: string };
 

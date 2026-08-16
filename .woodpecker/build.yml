@@ -19,6 +19,5 @@ steps:
             from_secret: nexus_woodpecker_password
       dockerfile: docker/all/Dockerfile
       platforms: linux/arm64/v8
-      tags:
-        - mleitz1-latest
-        - mleitz1-v1.26.10
+      # Same pattern as easy-easy dashboard/notify/sso: immutable SHA + rolling latest
+      tags: ${CI_COMMIT_SHA},latest

@@ -2,7 +2,7 @@
 # BACKEND API LAYER
 #
 
-FROM docker.io/golang:1.25-alpine AS api-builder
+FROM docker.io/golang:1.26.5-alpine AS api-builder
 
 WORKDIR /server
 
@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 
 COPY ./app ./app
 COPY ./lib ./lib
+COPY ./sdk ./sdk
 COPY ./cmd ./cmd
 COPY ./internal ./internal
 
@@ -20,7 +21,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=cache,target="/root/.cache/go-build" \
     CGO_ENABLED=0 GOOS=linux go build -o /server/storyden-api ./cmd/backend
 
-FROM docker.io/node:22.21.1-alpine AS base
+FROM docker.io/node:24.17.0-alpine3.24 AS base
 
 #
 # DEPENDENCIES LAYER
@@ -44,6 +45,7 @@ FROM base AS builder
 WORKDIR /storyden
 COPY --from=deps /storyden/node_modules ./node_modules
 COPY ./web .
+COPY --from=api-builder /server/storyden-api ./storyden-api
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_BUILD_STANDALONE=true
@@ -75,7 +77,7 @@ COPY --from=builder /storyden/public ./public
 
 RUN mkdir .next && mkdir data
 
-COPY --from=api-builder --chown=storyden:storyden /server/storyden-api ./storyden-api
+COPY --from=builder --chown=storyden:storyden /storyden/storyden-api ./storyden-api
 COPY --from=builder --chown=storyden:storyden /storyden/.next/standalone ./
 COPY --from=builder --chown=storyden:storyden /storyden/.next/static ./.next/static
 

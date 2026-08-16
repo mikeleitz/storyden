@@ -11,6 +11,7 @@ import (
 
 	"github.com/Southclaws/storyden/app/resources/account/role/role_hydrate"
 	"github.com/Southclaws/storyden/app/resources/collection"
+	"github.com/Southclaws/storyden/app/resources/pagination"
 	"github.com/Southclaws/storyden/app/resources/visibility"
 	"github.com/Southclaws/storyden/internal/ent"
 	ent_account "github.com/Southclaws/storyden/internal/ent/account"
@@ -70,7 +71,7 @@ func WithVisibility(v ...visibility.Visibility) ItemFilter {
 	}
 }
 
-func (d *Querier) List(ctx context.Context, filters ...Option) ([]*collection.Collection, error) {
+func (d *Querier) List(ctx context.Context, params pagination.Parameters, filters ...Option) (*pagination.Result[*collection.Collection], error) {
 	var opts listOption
 	for _, fn := range filters {
 		fn(&opts)
@@ -86,7 +87,21 @@ func (d *Querier) List(ctx context.Context, filters ...Option) ([]*collection.Co
 		q.Where(ent_collection.HasOwnerWith(ent_account.Handle(v)))
 	})
 
-	cols, err := q.All(ctx)
+	total, err := q.Clone().Count(ctx)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	cols, err := q.
+		// id breaks ties, created_at alone leaves rows sharing a timestamp free
+		// to move between adjacent offset pages
+		Order(
+			ent.Desc(ent_collection.FieldCreatedAt),
+			ent.Desc(ent_collection.FieldID),
+		).
+		Limit(params.Limit()).
+		Offset(params.Offset()).
+		All(ctx)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
@@ -104,7 +119,9 @@ func (d *Querier) List(ctx context.Context, filters ...Option) ([]*collection.Co
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	return all, nil
+	result := pagination.NewPageResult(params, total, all)
+
+	return &result, nil
 }
 
 func (d *Querier) Get(ctx context.Context, qk collection.QueryKey, filters ...ItemFilter) (*collection.CollectionWithItems, error) {

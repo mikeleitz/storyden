@@ -2,7 +2,9 @@ name: Test frontend
 
 on:
   push:
-    paths-ignore:
+    branches:
+      - main
+    paths-ignore: &ignored_paths
       - "home/**"
       - ".vscode/**"
       - "*.md"
@@ -15,19 +17,18 @@ on:
       - ".nvmrc"
       - ".vercelignore"
 
+  pull_request:
+    paths-ignore: *ignored_paths
+
 jobs:
   frontend-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-
       - run: corepack enable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm

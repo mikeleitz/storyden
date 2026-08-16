@@ -360,6 +360,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
 		{Name: "email_address", Type: field.TypeString, Unique: true, Size: 254},
 		{Name: "verification_code", Type: field.TypeString, Size: 6},
+		{Name: "verification_code_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "verification_attempts", Type: field.TypeInt, Default: "0"},
 		{Name: "verified", Type: field.TypeBool, Default: "false"},
 		{Name: "account_id", Type: field.TypeString, Nullable: true, Size: 20},
 	}
@@ -371,7 +373,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "emails_accounts_emails",
-				Columns:    []*schema.Column{EmailsColumns[5]},
+				Columns:    []*schema.Column{EmailsColumns[7]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -971,7 +973,7 @@ var (
 			},
 			{
 				Name:    "oauthdeviceauthorisation_user_code_hash",
-				Unique:  false,
+				Unique:  true,
 				Columns: []*schema.Column{OauthDeviceAuthorisationsColumns[3]},
 			},
 		},
@@ -1019,6 +1021,82 @@ var (
 				Name:    "oauthrefreshtoken_token_hash",
 				Unique:  true,
 				Columns: []*schema.Column{OauthRefreshTokensColumns[2]},
+			},
+		},
+	}
+	// OauthRemoteAuthorisationFlowsColumns holds the columns for the "oauth_remote_authorisation_flows" table.
+	OauthRemoteAuthorisationFlowsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "state_hash", Type: field.TypeString, Unique: true},
+		{Name: "pkce_verifier", Type: field.TypeString},
+		{Name: "redirect_uri", Type: field.TypeString},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "consumed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "connection_id", Type: field.TypeString, Size: 20},
+	}
+	// OauthRemoteAuthorisationFlowsTable holds the schema information for the "oauth_remote_authorisation_flows" table.
+	OauthRemoteAuthorisationFlowsTable = &schema.Table{
+		Name:       "oauth_remote_authorisation_flows",
+		Columns:    OauthRemoteAuthorisationFlowsColumns,
+		PrimaryKey: []*schema.Column{OauthRemoteAuthorisationFlowsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "oauth_remote_authorisation_flows_oauth_remote_connections_authorisation_flows",
+				Columns:    []*schema.Column{OauthRemoteAuthorisationFlowsColumns[7]},
+				RefColumns: []*schema.Column{OauthRemoteConnectionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
+	// OauthRemoteConnectionsColumns holds the columns for the "oauth_remote_connections" table.
+	OauthRemoteConnectionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "resource_url", Type: field.TypeString},
+		{Name: "resource", Type: field.TypeString, Nullable: true},
+		{Name: "resource_name", Type: field.TypeString, Nullable: true},
+		{Name: "protected_resource_metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "authorization_server", Type: field.TypeString, Nullable: true},
+		{Name: "authorization_server_metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "mode", Type: field.TypeEnum, Enums: []string{"cimd", "dcr", "manual"}, Default: "manual"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "connected", "error"}, Default: "pending"},
+		{Name: "client_id", Type: field.TypeString, Nullable: true},
+		{Name: "client_secret", Type: field.TypeString, Nullable: true},
+		{Name: "authorization_endpoint", Type: field.TypeString, Nullable: true},
+		{Name: "token_endpoint", Type: field.TypeString, Nullable: true},
+		{Name: "registration_endpoint", Type: field.TypeString, Nullable: true},
+		{Name: "token_endpoint_auth_method", Type: field.TypeString, Nullable: true},
+		{Name: "redirect_uris", Type: field.TypeJSON, Nullable: true},
+		{Name: "redirect_uri", Type: field.TypeString, Nullable: true},
+		{Name: "scope", Type: field.TypeString, Nullable: true},
+		{Name: "access_token", Type: field.TypeString, Nullable: true},
+		{Name: "refresh_token", Type: field.TypeString, Nullable: true},
+		{Name: "token_type", Type: field.TypeString, Nullable: true},
+		{Name: "token_expiry", Type: field.TypeTime, Nullable: true},
+		{Name: "token_refresh_started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_error", Type: field.TypeString, Nullable: true},
+		{Name: "added_by", Type: field.TypeString, Size: 20},
+	}
+	// OauthRemoteConnectionsTable holds the schema information for the "oauth_remote_connections" table.
+	OauthRemoteConnectionsTable = &schema.Table{
+		Name:       "oauth_remote_connections",
+		Columns:    OauthRemoteConnectionsColumns,
+		PrimaryKey: []*schema.Column{OauthRemoteConnectionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "oauth_remote_connections_accounts_oauth_remote_connections",
+				Columns:    []*schema.Column{OauthRemoteConnectionsColumns[26]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "oauthremoteconnection_resource_url_authorization_server_added_by",
+				Unique:  true,
+				Columns: []*schema.Column{OauthRemoteConnectionsColumns[3], OauthRemoteConnectionsColumns[7], OauthRemoteConnectionsColumns[26]},
 			},
 		},
 	}
@@ -1250,38 +1328,6 @@ var (
 			},
 		},
 	}
-	// QuestionsColumns holds the columns for the "questions" table.
-	QuestionsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeString, Size: 20},
-		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
-		{Name: "indexed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "slug", Type: field.TypeString, Unique: true},
-		{Name: "query", Type: field.TypeString},
-		{Name: "result", Type: field.TypeString},
-		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
-		{Name: "account_id", Type: field.TypeString, Nullable: true, Size: 20},
-		{Name: "parent_question_id", Type: field.TypeString, Nullable: true, Size: 20},
-	}
-	// QuestionsTable holds the schema information for the "questions" table.
-	QuestionsTable = &schema.Table{
-		Name:       "questions",
-		Columns:    QuestionsColumns,
-		PrimaryKey: []*schema.Column{QuestionsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "questions_accounts_questions",
-				Columns:    []*schema.Column{QuestionsColumns[7]},
-				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-			{
-				Symbol:     "questions_questions_parent_question",
-				Columns:    []*schema.Column{QuestionsColumns[8]},
-				RefColumns: []*schema.Column{QuestionsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
-	}
 	// ReactsColumns holds the columns for the "reacts" table.
 	ReactsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Size: 20},
@@ -1350,6 +1396,426 @@ var (
 			},
 		},
 	}
+	// RobotsColumns holds the columns for the "robots" table.
+	RobotsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "playbook", Type: field.TypeString},
+		{Name: "model", Type: field.TypeString},
+		{Name: "tools", Type: field.TypeJSON, Nullable: true},
+		{Name: "toolsets", Type: field.TypeJSON, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "author_id", Type: field.TypeString, Size: 20},
+		{Name: "workspace_id", Type: field.TypeString, Nullable: true, Size: 20},
+	}
+	// RobotsTable holds the schema information for the "robots" table.
+	RobotsTable = &schema.Table{
+		Name:       "robots",
+		Columns:    RobotsColumns,
+		PrimaryKey: []*schema.Column{RobotsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robots_accounts_robots",
+				Columns:    []*schema.Column{RobotsColumns[10]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robots_robot_workspaces_robots",
+				Columns:    []*schema.Column{RobotsColumns[11]},
+				RefColumns: []*schema.Column{RobotWorkspacesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// RobotMcpServersColumns holds the columns for the "robot_mcp_servers" table.
+	RobotMcpServersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "slug", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "endpoint_url", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "bearer_token", Type: field.TypeString, Nullable: true},
+		{Name: "last_refreshed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_error", Type: field.TypeString, Nullable: true},
+		{Name: "added_by", Type: field.TypeString, Size: 20},
+		{Name: "oauth_remote_connection_id", Type: field.TypeString, Nullable: true, Size: 20},
+	}
+	// RobotMcpServersTable holds the schema information for the "robot_mcp_servers" table.
+	RobotMcpServersTable = &schema.Table{
+		Name:       "robot_mcp_servers",
+		Columns:    RobotMcpServersColumns,
+		PrimaryKey: []*schema.Column{RobotMcpServersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_mcp_servers_accounts_robot_mcp_servers",
+				Columns:    []*schema.Column{RobotMcpServersColumns[11]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robot_mcp_servers_oauth_remote_connections_robot_mcp_servers",
+				Columns:    []*schema.Column{RobotMcpServersColumns[12]},
+				RefColumns: []*schema.Column{OauthRemoteConnectionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotmcpserver_slug",
+				Unique:  true,
+				Columns: []*schema.Column{RobotMcpServersColumns[4]},
+			},
+		},
+	}
+	// RobotMcpToolsColumns holds the columns for the "robot_mcp_tools" table.
+	RobotMcpToolsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tool_id", Type: field.TypeString},
+		{Name: "remote_name", Type: field.TypeString},
+		{Name: "callable_name", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString, Nullable: true},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "input_schema", Type: field.TypeJSON, Nullable: true},
+		{Name: "output_schema", Type: field.TypeJSON, Nullable: true},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "last_seen_at", Type: field.TypeTime},
+		{Name: "server_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotMcpToolsTable holds the schema information for the "robot_mcp_tools" table.
+	RobotMcpToolsTable = &schema.Table{
+		Name:       "robot_mcp_tools",
+		Columns:    RobotMcpToolsColumns,
+		PrimaryKey: []*schema.Column{RobotMcpToolsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_mcp_tools_robot_mcp_servers_tools",
+				Columns:    []*schema.Column{RobotMcpToolsColumns[13]},
+				RefColumns: []*schema.Column{RobotMcpServersColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotmcptool_tool_id",
+				Unique:  true,
+				Columns: []*schema.Column{RobotMcpToolsColumns[3]},
+			},
+			{
+				Name:    "robotmcptool_server_id_callable_name",
+				Unique:  true,
+				Columns: []*schema.Column{RobotMcpToolsColumns[13], RobotMcpToolsColumns[5]},
+			},
+			{
+				Name:    "robotmcptool_server_id_remote_name",
+				Unique:  true,
+				Columns: []*schema.Column{RobotMcpToolsColumns[13], RobotMcpToolsColumns[4]},
+			},
+		},
+	}
+	// RobotProviderModelsColumns holds the columns for the "robot_provider_models" table.
+	RobotProviderModelsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "raw", Type: field.TypeJSON, Nullable: true},
+		{Name: "last_seen_at", Type: field.TypeTime},
+	}
+	// RobotProviderModelsTable holds the schema information for the "robot_provider_models" table.
+	RobotProviderModelsTable = &schema.Table{
+		Name:       "robot_provider_models",
+		Columns:    RobotProviderModelsColumns,
+		PrimaryKey: []*schema.Column{RobotProviderModelsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotprovidermodel_provider_name",
+				Unique:  true,
+				Columns: []*schema.Column{RobotProviderModelsColumns[3], RobotProviderModelsColumns[4]},
+			},
+		},
+	}
+	// RobotSessionsColumns holds the columns for the "robot_sessions" table.
+	RobotSessionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "state", Type: field.TypeJSON, Nullable: true},
+		{Name: "execution_status", Type: field.TypeEnum, Enums: []string{"idle", "running", "blocked"}, Default: "idle"},
+		{Name: "active_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "lease_token", Type: field.TypeString, Nullable: true},
+		{Name: "lease_generation", Type: field.TypeUint64, Default: 0},
+		{Name: "next_event_sequence", Type: field.TypeUint64, Default: 0},
+		{Name: "lease_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "account_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionsTable holds the schema information for the "robot_sessions" table.
+	RobotSessionsTable = &schema.Table{
+		Name:       "robot_sessions",
+		Columns:    RobotSessionsColumns,
+		PrimaryKey: []*schema.Column{RobotSessionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_sessions_accounts_created_robot_sessions",
+				Columns:    []*schema.Column{RobotSessionsColumns[11]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+		},
+	}
+	// RobotSessionMessagesColumns holds the columns for the "robot_session_messages" table.
+	RobotSessionMessagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "sequence", Type: field.TypeUint64},
+		{Name: "event_kind", Type: field.TypeEnum, Enums: []string{"message", "turn_queued", "turn_completed", "turn_blocked", "turn_failed", "turn_cancelled"}, Default: "message"},
+		{Name: "invocation_id", Type: field.TypeString, Nullable: true},
+		{Name: "branch", Type: field.TypeString, Nullable: true},
+		{Name: "isolation_scope", Type: field.TypeString, Nullable: true},
+		{Name: "builtin_robot", Type: field.TypeString, Nullable: true},
+		{Name: "event_data", Type: field.TypeJSON, Nullable: true},
+		{Name: "error_text", Type: field.TypeString, Nullable: true},
+		{Name: "account_id", Type: field.TypeString, Nullable: true, Size: 20},
+		{Name: "robot_id", Type: field.TypeString, Nullable: true, Size: 20},
+		{Name: "session_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionMessagesTable holds the schema information for the "robot_session_messages" table.
+	RobotSessionMessagesTable = &schema.Table{
+		Name:       "robot_session_messages",
+		Columns:    RobotSessionMessagesColumns,
+		PrimaryKey: []*schema.Column{RobotSessionMessagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_session_messages_accounts_robot_messages",
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[11]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "robot_session_messages_robots_messages",
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[12]},
+				RefColumns: []*schema.Column{RobotsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robot_session_messages_robot_sessions_messages",
+				Columns:    []*schema.Column{RobotSessionMessagesColumns[13]},
+				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotsessionmessage_session_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[1]},
+			},
+			{
+				Name:    "robotsessionmessage_session_id_sequence",
+				Unique:  true,
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[3]},
+			},
+			{
+				Name:    "robotsessionmessage_session_id_turn_id_sequence",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionMessagesColumns[13], RobotSessionMessagesColumns[2], RobotSessionMessagesColumns[3]},
+			},
+		},
+	}
+	// RobotSessionTurnsColumns holds the columns for the "robot_session_turns" table.
+	RobotSessionTurnsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "source_kind", Type: field.TypeString},
+		{Name: "robot_ref", Type: field.TypeString},
+		{Name: "input_data", Type: field.TypeJSON, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"queued", "running", "completed", "blocked", "failed", "cancelled"}, Default: "queued"},
+		{Name: "continuation_of_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
+		{Name: "error_text", Type: field.TypeString, Nullable: true},
+		{Name: "initiated_by_account_id", Type: field.TypeString, Nullable: true, Size: 20},
+		{Name: "session_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionTurnsTable holds the schema information for the "robot_session_turns" table.
+	RobotSessionTurnsTable = &schema.Table{
+		Name:       "robot_session_turns",
+		Columns:    RobotSessionTurnsColumns,
+		PrimaryKey: []*schema.Column{RobotSessionTurnsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_session_turns_accounts_initiated_robot_turns",
+				Columns:    []*schema.Column{RobotSessionTurnsColumns[11]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "robot_session_turns_robot_sessions_turns",
+				Columns:    []*schema.Column{RobotSessionTurnsColumns[12]},
+				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotsessionturn_session_id_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionTurnsColumns[12], RobotSessionTurnsColumns[6], RobotSessionTurnsColumns[1]},
+			},
+			{
+				Name:    "robotsessionturn_initiated_by_account_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionTurnsColumns[11], RobotSessionTurnsColumns[1]},
+			},
+		},
+	}
+	// RobotSessionViewsColumns holds the columns for the "robot_session_views" table.
+	RobotSessionViewsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "last_accessed_at", Type: field.TypeTime},
+		{Name: "resume_turn_id", Type: field.TypeString, Nullable: true},
+		{Name: "last_seen_event_sequence", Type: field.TypeUint64, Default: 0},
+		{Name: "account_id", Type: field.TypeString, Size: 20},
+		{Name: "session_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotSessionViewsTable holds the schema information for the "robot_session_views" table.
+	RobotSessionViewsTable = &schema.Table{
+		Name:       "robot_session_views",
+		Columns:    RobotSessionViewsColumns,
+		PrimaryKey: []*schema.Column{RobotSessionViewsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_session_views_accounts_robot_session_views",
+				Columns:    []*schema.Column{RobotSessionViewsColumns[6]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robot_session_views_robot_sessions_views",
+				Columns:    []*schema.Column{RobotSessionViewsColumns[7]},
+				RefColumns: []*schema.Column{RobotSessionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robotsessionview_session_id_account_id",
+				Unique:  true,
+				Columns: []*schema.Column{RobotSessionViewsColumns[7], RobotSessionViewsColumns[6]},
+			},
+			{
+				Name:    "robotsessionview_account_id_last_accessed_at",
+				Unique:  false,
+				Columns: []*schema.Column{RobotSessionViewsColumns[6], RobotSessionViewsColumns[3]},
+			},
+		},
+	}
+	// RobotToolsetsColumns holds the columns for the "robot_toolsets" table.
+	RobotToolsetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "instruction", Type: field.TypeString, Nullable: true},
+		{Name: "tools", Type: field.TypeJSON, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "author_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotToolsetsTable holds the schema information for the "robot_toolsets" table.
+	RobotToolsetsTable = &schema.Table{
+		Name:       "robot_toolsets",
+		Columns:    RobotToolsetsColumns,
+		PrimaryKey: []*schema.Column{RobotToolsetsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_toolsets_accounts_robot_toolsets",
+				Columns:    []*schema.Column{RobotToolsetsColumns[8]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "robottoolset_author_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{RobotToolsetsColumns[8], RobotToolsetsColumns[3]},
+			},
+		},
+	}
+	// RobotWorkspacesColumns holds the columns for the "robot_workspaces" table.
+	RobotWorkspacesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "provider", Type: field.TypeEnum, Enums: []string{"local", "sprites"}, Default: "local"},
+		{Name: "config", Type: field.TypeJSON, Nullable: true},
+		{Name: "allow_untrusted_commands", Type: field.TypeBool, Default: false},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_by", Type: field.TypeString, Size: 20},
+	}
+	// RobotWorkspacesTable holds the schema information for the "robot_workspaces" table.
+	RobotWorkspacesTable = &schema.Table{
+		Name:       "robot_workspaces",
+		Columns:    RobotWorkspacesColumns,
+		PrimaryKey: []*schema.Column{RobotWorkspacesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_workspaces_accounts_robot_workspaces",
+				Columns:    []*schema.Column{RobotWorkspacesColumns[9]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
+	// RobotWorkspaceInstancesColumns holds the columns for the "robot_workspace_instances" table.
+	RobotWorkspaceInstancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 20},
+		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeEnum, Enums: []string{"local", "sprites"}, Default: "local"},
+		{Name: "provider_state", Type: field.TypeJSON, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_by", Type: field.TypeString, Size: 20},
+		{Name: "workspace_id", Type: field.TypeString, Size: 20},
+	}
+	// RobotWorkspaceInstancesTable holds the schema information for the "robot_workspace_instances" table.
+	RobotWorkspaceInstancesTable = &schema.Table{
+		Name:       "robot_workspace_instances",
+		Columns:    RobotWorkspaceInstancesColumns,
+		PrimaryKey: []*schema.Column{RobotWorkspaceInstancesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "robot_workspace_instances_accounts_robot_workspace_instances",
+				Columns:    []*schema.Column{RobotWorkspaceInstancesColumns[6]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "robot_workspace_instances_robot_workspaces_instances",
+				Columns:    []*schema.Column{RobotWorkspaceInstancesColumns[7]},
+				RefColumns: []*schema.Column{RobotWorkspacesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Size: 20},
@@ -1371,6 +1837,7 @@ var (
 	SessionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Size: 20},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
+		{Name: "token_hash", Type: field.TypeString, Unique: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
 		{Name: "account_id", Type: field.TypeString, Size: 20},
@@ -1383,7 +1850,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sessions_accounts_sessions",
-				Columns:    []*schema.Column{SessionsColumns[4]},
+				Columns:    []*schema.Column{SessionsColumns[5]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -1670,15 +2137,27 @@ var (
 		OauthClientsTable,
 		OauthDeviceAuthorisationsTable,
 		OauthRefreshTokensTable,
+		OauthRemoteAuthorisationFlowsTable,
+		OauthRemoteConnectionsTable,
 		PluginsTable,
 		PostsTable,
 		PostReadsTable,
 		PropertiesTable,
 		PropertySchemasTable,
 		PropertySchemaFieldsTable,
-		QuestionsTable,
 		ReactsTable,
 		ReportsTable,
+		RobotsTable,
+		RobotMcpServersTable,
+		RobotMcpToolsTable,
+		RobotProviderModelsTable,
+		RobotSessionsTable,
+		RobotSessionMessagesTable,
+		RobotSessionTurnsTable,
+		RobotSessionViewsTable,
+		RobotToolsetsTable,
+		RobotWorkspacesTable,
+		RobotWorkspaceInstancesTable,
 		RolesTable,
 		SessionsTable,
 		SettingsTable,
@@ -1748,6 +2227,8 @@ func init() {
 	OauthRefreshTokensTable.ForeignKeys[0].RefTable = AccountsTable
 	OauthRefreshTokensTable.ForeignKeys[1].RefTable = OauthClientsTable
 	OauthRefreshTokensTable.ForeignKeys[2].RefTable = OauthRefreshTokensTable
+	OauthRemoteAuthorisationFlowsTable.ForeignKeys[0].RefTable = OauthRemoteConnectionsTable
+	OauthRemoteConnectionsTable.ForeignKeys[0].RefTable = AccountsTable
 	PluginsTable.ForeignKeys[0].RefTable = AccountsTable
 	PostsTable.ForeignKeys[0].RefTable = AccountsTable
 	PostsTable.ForeignKeys[1].RefTable = CategoriesTable
@@ -1759,12 +2240,27 @@ func init() {
 	PropertiesTable.ForeignKeys[0].RefTable = NodesTable
 	PropertiesTable.ForeignKeys[1].RefTable = PropertySchemaFieldsTable
 	PropertySchemaFieldsTable.ForeignKeys[0].RefTable = PropertySchemasTable
-	QuestionsTable.ForeignKeys[0].RefTable = AccountsTable
-	QuestionsTable.ForeignKeys[1].RefTable = QuestionsTable
 	ReactsTable.ForeignKeys[0].RefTable = AccountsTable
 	ReactsTable.ForeignKeys[1].RefTable = PostsTable
 	ReportsTable.ForeignKeys[0].RefTable = AccountsTable
 	ReportsTable.ForeignKeys[1].RefTable = AccountsTable
+	RobotsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotsTable.ForeignKeys[1].RefTable = RobotWorkspacesTable
+	RobotMcpServersTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotMcpServersTable.ForeignKeys[1].RefTable = OauthRemoteConnectionsTable
+	RobotMcpToolsTable.ForeignKeys[0].RefTable = RobotMcpServersTable
+	RobotSessionsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionMessagesTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionMessagesTable.ForeignKeys[1].RefTable = RobotsTable
+	RobotSessionMessagesTable.ForeignKeys[2].RefTable = RobotSessionsTable
+	RobotSessionTurnsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionTurnsTable.ForeignKeys[1].RefTable = RobotSessionsTable
+	RobotSessionViewsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotSessionViewsTable.ForeignKeys[1].RefTable = RobotSessionsTable
+	RobotToolsetsTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotWorkspacesTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotWorkspaceInstancesTable.ForeignKeys[0].RefTable = AccountsTable
+	RobotWorkspaceInstancesTable.ForeignKeys[1].RefTable = RobotWorkspacesTable
 	SessionsTable.ForeignKeys[0].RefTable = AccountsTable
 	WarningsTable.ForeignKeys[0].RefTable = AccountsTable
 	WarningsTable.ForeignKeys[1].RefTable = AccountsTable

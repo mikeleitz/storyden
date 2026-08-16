@@ -82,7 +82,6 @@ func (Account) Edges() []ent.Edge {
 			Unique(),
 
 		edge.To("posts", Post.Type),
-		edge.To("questions", Question.Type),
 
 		edge.To("reacts", React.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
@@ -111,6 +110,9 @@ func (Account) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
 		edge.To("oauth_refresh_tokens", OAuthRefreshToken.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("oauth_remote_connections", OAuthRemoteConnection.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
 		edge.To("claimed_oauth_device_authorisations", OAuthDeviceAuthorisation.Type).
@@ -159,6 +161,33 @@ func (Account) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 
 		edge.To("authored_warnings", Warning.Type).
+			Annotations(entsql.OnDelete(entsql.SetNull)),
+
+		edge.To("robots", Robot.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("robot_toolsets", RobotToolset.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("robot_workspaces", RobotWorkspace.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("robot_workspace_instances", RobotWorkspaceInstance.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("robot_mcp_servers", RobotMCPServer.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("created_robot_sessions", RobotSession.Type).
+			Annotations(entsql.OnDelete(entsql.Restrict)),
+
+		edge.To("robot_session_views", RobotSessionView.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
+
+		edge.To("robot_messages", RobotSessionMessage.Type).
+			Annotations(entsql.OnDelete(entsql.SetNull)),
+
+		edge.To("initiated_robot_turns", RobotSessionTurn.Type).
 			Annotations(entsql.OnDelete(entsql.SetNull)),
 	}
 }

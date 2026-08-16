@@ -2,12 +2,15 @@ package collection_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/rs/xid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
 
 	"github.com/Southclaws/opt"
@@ -223,3 +226,63 @@ func TestCollectionCRUD(t *testing.T) {
 		}))
 	}))
 }
+
+func TestCollectionListIsPaged(t *testing.T) {
+	t.Parallel()
+
+	integration.Test(t, nil, e2e.Setup(), fx.Invoke(func(
+		lc fx.Lifecycle,
+		root context.Context,
+		cl *openapi.ClientWithResponses,
+		sh *e2e.SessionHelper,
+		aw *account_writer.Writer,
+	) {
+		lc.Append(fx.StartHook(func() {
+			a := assert.New(t)
+			r := require.New(t)
+
+			ctx, acc := e2e.WithAccount(root, aw, seed.Account_002_Frigg)
+			session := sh.WithSession(ctx)
+
+			const total = 52
+			for i := range total {
+				resp, err := cl.CollectionCreateWithResponse(root, openapi.CollectionInitialProps{
+					Name: fmt.Sprintf("paged collection %d %s", i, uuid.NewString()),
+				}, session)
+				tests.Ok(t, err, resp)
+			}
+
+			handle := openapi.AccountHandleQueryParam(acc.Handle)
+
+			first := tests.AssertRequest(cl.CollectionListWithResponse(root, &openapi.CollectionListParams{
+				AccountHandle: &handle,
+				Page:          ptr("1"),
+			}))(t, http.StatusOK)
+			r.NotNil(first.JSON200)
+			a.Equal(1, first.JSON200.CurrentPage)
+			a.Len(first.JSON200.Collections, first.JSON200.PageSize)
+			a.Equal(2, first.JSON200.TotalPages)
+
+			second := tests.AssertRequest(cl.CollectionListWithResponse(root, &openapi.CollectionListParams{
+				AccountHandle: &handle,
+				Page:          ptr("2"),
+			}))(t, http.StatusOK)
+			r.NotNil(second.JSON200)
+			a.Equal(2, second.JSON200.CurrentPage)
+			a.Len(second.JSON200.Collections, total-first.JSON200.PageSize)
+
+			seen := map[string]struct{}{}
+			for _, c := range first.JSON200.Collections {
+				seen[c.Id] = struct{}{}
+			}
+			for _, c := range second.JSON200.Collections {
+				_, repeated := seen[c.Id]
+				a.False(repeated, "a collection must not appear on two pages")
+				seen[c.Id] = struct{}{}
+			}
+			a.Len(seen, total, "walking the pages must reach every collection")
+		}))
+	}))
+}
+
+func ptr[T any](v T) *T { return &v }

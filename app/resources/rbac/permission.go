@@ -13,40 +13,6 @@ import (
 
 var ErrPermissions = fault.New("invalid permissions", ftag.With(ftag.PermissionDenied))
 
-var AllPermissions = PermissionList{
-	PermissionCreatePost,
-	PermissionReadPublishedThreads,
-	PermissionCreateReaction,
-	PermissionManagePosts,
-	PermissionManageCategories,
-	PermissionCreateInvitation,
-	PermissionReadPublishedLibrary,
-	PermissionManageLibrary,
-	PermissionSubmitLibraryNode,
-	PermissionSubmitLibraryNodeChanges,
-	PermissionUploadAsset,
-	PermissionManageEvents,
-	PermissionListProfiles,
-	PermissionReadProfile,
-	PermissionCreateCollection,
-	PermissionListCollections,
-	PermissionReadCollection,
-	PermissionManageCollections,
-	PermissionCollectionSubmit,
-	PermissionUsePersonalAccessKeys,
-	PermissionUseOauthClients,
-	PermissionManageSettings,
-	PermissionManageAccounts,
-	PermissionManageWarnings,
-	PermissionManageSuspensions,
-	PermissionManageRoles,
-	PermissionManageReports,
-	PermissionViewAccounts,
-	PermissionViewModerationNotes,
-	PermissionManageModerationNotes,
-	PermissionAdministrator,
-}
-
 var readPermissions = []Permission{
 	PermissionReadPublishedThreads,
 	PermissionReadPublishedLibrary,
@@ -120,6 +86,19 @@ func NewList(permissions ...Permission) Permissions {
 	}
 
 	return Permissions{permissions, m}
+}
+
+// Intersect returns only the permissions held by both sets, used where a
+// delegated credential must never outrank the account it acts for.
+func (p Permissions) Intersect(other Permissions) Permissions {
+	held := make([]Permission, 0, len(p.p))
+	for _, pp := range p.p {
+		if _, ok := other.m[pp]; ok {
+			held = append(held, pp)
+		}
+	}
+
+	return NewList(held...)
 }
 
 func (p Permissions) HasAll(perms ...Permission) bool {

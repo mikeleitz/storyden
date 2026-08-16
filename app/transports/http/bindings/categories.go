@@ -2,7 +2,6 @@ package bindings
 
 import (
 	"context"
-	"time"
 
 	"github.com/Southclaws/dt"
 	"github.com/Southclaws/fault"
@@ -85,9 +84,8 @@ func (c Categories) CategoryGet(ctx context.Context, request openapi.CategoryGet
 	if notModified {
 		return openapi.CategoryGet304Response{
 			Headers: openapi.NotModifiedResponseHeaders{
-				CacheControl: categoryGetCacheControl,
-				LastModified: etag.Time.Format(time.RFC1123),
-				ETag:         etag.String(),
+				CacheControl: ptr(categoryGetCacheControl),
+				ETag:         ptr(etag.String()),
 			},
 		}, nil
 	}
@@ -106,9 +104,8 @@ func (c Categories) CategoryGet(ctx context.Context, request openapi.CategoryGet
 		CategoryGetOKJSONResponse: openapi.CategoryGetOKJSONResponse{
 			Body: serialiseCategory(cat),
 			Headers: openapi.CategoryGetOKResponseHeaders{
-				CacheControl: categoryGetCacheControl,
-				LastModified: etag.Time.Format(time.RFC1123),
-				ETag:         etag.String(),
+				CacheControl: ptr(categoryGetCacheControl),
+				ETag:         ptr(etag.String()),
 			},
 		},
 	}, nil
@@ -231,8 +228,4 @@ func serialiseCategoryReference(c category.Category) openapi.CategoryReference {
 		Children:    children,
 		Meta:        (*openapi.Metadata)(&c.Metadata),
 	}
-}
-
-func serialiseCategoryReferencePtr(c *category.Category) openapi.CategoryReference {
-	return serialiseCategoryReference(*c)
 }

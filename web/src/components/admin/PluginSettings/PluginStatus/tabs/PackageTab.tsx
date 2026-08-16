@@ -3,7 +3,10 @@ import { useSWRConfig } from "swr";
 
 import { fetcher, handle } from "@/api/client";
 import { mutateTransaction } from "@/api/mutate";
-import { getPluginGetKey } from "@/api/openapi-client/plugins";
+import {
+  getPluginGetKey,
+  pluginDownloadPackage,
+} from "@/api/openapi-client/plugins";
 import { Plugin } from "@/api/openapi-schema";
 import { PluginArchiveUpload } from "@/components/admin/PluginSettings/PluginArchiveUpload";
 import { useConfirmation } from "@/components/site/useConfirmation";
@@ -11,6 +14,7 @@ import { Admonition } from "@/components/ui/admonition";
 import * as Alert from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { WarningIcon } from "@/components/ui/icons/Warning";
+import { Text } from "@/components/ui/text";
 import { HStack, LStack, WStack, styled } from "@/styled-system/jsx";
 
 type Props = {
@@ -32,6 +36,7 @@ export function PackageTab({ plugin }: Props) {
   const { mutate } = useSWRConfig();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<PackageTabError | null>(null);
   const [success, setSuccess] = useState<PackageTabSuccess | null>(null);
 
@@ -91,14 +96,39 @@ export function PackageTab({ plugin }: Props) {
     }
   }
 
+  async function handleDownloadPackage() {
+    if (isDownloading) {
+      return;
+    }
+
+    setIsDownloading(true);
+    setError(null);
+
+    await handle(
+      async () => {
+        const archive = await pluginDownloadPackage(plugin.id);
+        downloadBlob(archive, pluginPackageFilename(plugin));
+      },
+      {
+        errorToast: false,
+        onError: async (err) => {
+          setError(normaliseError(err));
+        },
+        cleanup: async () => {
+          setIsDownloading(false);
+        },
+      },
+    );
+  }
+
   return (
     <LStack gap="4">
-      <styled.p fontSize="sm" color="fg.muted">
+      <Text variant="supporting">
         Upload a replacement plugin package.{" "}
         {plugin.status.active_state === "active"
           ? "This will restart the plugin with the new version."
           : "The new version will be used when the plugin is enabled."}
-      </styled.p>
+      </Text>
 
       <Alert.Root>
         <Alert.Icon asChild>
@@ -125,7 +155,18 @@ export function PackageTab({ plugin }: Props) {
         }
       />
 
-      <WStack justifyContent="end" alignItems="end">
+      <WStack>
+        <Button
+          size="sm"
+          variant="subtle"
+          onClick={handleDownloadPackage}
+          disabled={isDownloading || isUploading}
+          loading={isDownloading}
+          loadingText="Downloading..."
+        >
+          Download package
+        </Button>
+
         {isConfirming ? (
           <HStack gap="2">
             <Button
@@ -166,20 +207,20 @@ export function PackageTab({ plugin }: Props) {
       >
         {success && (
           <LStack gap="1">
-            <styled.p fontSize="sm">
+            <Text variant="supporting" color="text.default">
               Uploaded <styled.code>{success.fileName}</styled.code>.
-            </styled.p>
+            </Text>
             {success.previousVersion || success.newVersion ? (
-              <styled.p fontSize="sm">
+              <Text variant="supporting" color="text.default">
                 Version:{" "}
                 <styled.code>
                   {success.previousVersion ?? "-"} → {success.newVersion ?? "-"}
                 </styled.code>
-              </styled.p>
+              </Text>
             ) : (
-              <styled.p fontSize="sm">
+              <Text variant="supporting" color="text.default">
                 The plugin package was replaced successfully.
-              </styled.p>
+              </Text>
             )}
           </LStack>
         )}
@@ -194,7 +235,9 @@ export function PackageTab({ plugin }: Props) {
         {error && (
           <LStack gap="1">
             {error.overview && (
-              <styled.p fontSize="sm">{error.overview}</styled.p>
+              <Text variant="supporting" color="text.default">
+                {error.overview}
+              </Text>
             )}
             <styled.pre fontSize="xs" whiteSpace="pre-wrap">
               {error.details}
@@ -210,11 +253,10 @@ async function pluginUpdatePackage(
   pluginID: string,
   archive: File,
 ): Promise<Plugin> {
-  return fetcher<Plugin>({
-    url: `/plugins/${pluginID}/package`,
+  return fetcher<Plugin>(`/plugins/${pluginID}/package`, {
     method: "PATCH",
     headers: { "Content-Type": "application/zip" },
-    data: archive,
+    body: archive,
   });
 }
 
@@ -252,4 +294,26 @@ function toStringOrNull(input: unknown): string | null {
 
   const value = input.trim();
   return value === "" ? null : value;
+}
+
+function pluginPackageFilename(plugin: Plugin): string {
+  const manifestID = plugin.manifest["id"];
+
+  if (typeof manifestID === "string" && manifestID.trim() !== "") {
+    return `${manifestID.trim()}.zip`;
+  }
+
+  return `${plugin.id}.zip`;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

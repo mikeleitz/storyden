@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +26,6 @@ func TestWithRequestInfoProvidesAllGetters(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("If-None-Match", `"t-2026-01-02T03:04:05Z"`)
-	req.Header.Set("If-Modified-Since", time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC).Format(time.RFC1123))
 
 	ctx := WithRequestInfo(context.Background(), req, "ThreadGet", "203.0.113.9", "198.51.100.22")
 

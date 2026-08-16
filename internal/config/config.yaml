@@ -429,6 +429,13 @@
       description: |-
         The issuer/discovery URL for the Keycloak realm (e.g. https://auth.example.com/realms/YourRealm).
 
+    - env: OAUTH_KEYCLOAK_DISPLAY_NAME
+      name: KeycloakDisplayName
+      type: string
+      default: Keycloak
+      description: |-
+        The display name shown for the Keycloak login button.
+
     - env: OAUTH_ENABLED
       name: OAuthEnabled
       type: bool
@@ -474,6 +481,13 @@
       type: net/url.URL
       description: |-
         Frontend URL used by OAuth Authorization Code Grant users to approve or deny consent.
+
+    - env: OAUTH_AUTHORISATION_LOGIN_URL
+      name: OAuthAuthorisationLoginURL
+      type: net/url.URL
+      documented_default: "{PUBLIC_WEB_ADDRESS}/login"
+      description: |-
+        Frontend URL to redirect unauthenticated users to when starting the OAuth Authorization Code flow without a session. Defaults to `{PUBLIC_WEB_ADDRESS}/login` when unset.
 
     - env: OAUTH_SIGNING_KEY_BASE64
       name: OAuthSigningKeyBase64
@@ -740,6 +754,15 @@
 
         This directory should be persistent and writable by the Storyden process.
 
+    - env: "ROBOT_WORKSPACE_DATA_PATH"
+      name: RobotWorkspaceDataPath
+      type: string
+      default: "./data/robot-workspaces"
+      description: |-
+        The directory where local Robot workspace instance files will be stored. Each workspace instance gets its own subdirectory keyed by the workspace instance ID.
+
+        This directory should be persistent and writable by the Storyden process when local Robot workspaces are used.
+
     - env: "PLUGIN_RUNTIME_PROVIDER"
       name: PluginRuntimeProvider
       type: string
@@ -797,7 +820,7 @@
 
 - section: Artificial intelligence/language models
   description: |-
-    Configuration for optional AI features. These can be useful for organising large amounts of library pages and threads, but it can also provide other features such as recommendations and ask-based conversational searching.
+    Configuration for optional AI features. These can be useful for organising large amounts of library pages and threads, but it can also provide other features such as recommendations and chat-based conversational searching.
   fields:
     - env: "MCP_ENABLED"
       name: MCPEnabled
@@ -823,24 +846,6 @@
       type: string
       description: |-
         When `LANGUAGE_MODEL_PROVIDER` is set to `openai`, this is the API key for the OpenAI API.
-
-    - env: "ASKER_PROVIDER"
-      name: AskerProvider
-      type: string
-      default: ""
-      description: |-
-        The Asker feature provides a conversational interface for exploring the community's content across library pages, threads, links, profiles, etc. It is separate from the language model provider as some providers support different features.
-
-        This can be set to either:
-
-        - `openai` for OpenAI
-        - `perplexity` for Perplexity AI - note that Perplexity does not currently support all the features necessary to be a `LANGUAGE_MODEL_PROVIDER` so it is only available as an `ASKER_PROVIDER`.
-
-    - env: "PERPLEXITY_API_KEY"
-      name: PerplexityAPIKey
-      type: string
-      description: |-
-        If `ASKER_PROVIDER` is set to `perplexity`, this is the API key for the Perplexity API.
 
 - section: Semdex
   description: |-

@@ -35,6 +35,11 @@ const (
 
 	cleanupInterval          = time.Hour
 	dcrClientRetentionPeriod = 7 * 24 * time.Hour
+
+	// rotation keeps every superseded row so revokeRefreshTokenFamily can walk
+	// the chain, they are dropped once they have been unusable for this long
+	refreshTokenRetentionPeriod = 7 * 24 * time.Hour
+	maxUserCodeInputLength      = 32
 )
 
 type Error struct {
@@ -189,12 +194,19 @@ func (s *Service) cleanupExpiredRecords(ctx context.Context, logger *slog.Logger
 		return
 	}
 
-	if deviceAuthorisations > 0 || authorizationRequests > 0 || unusedDCRClients > 0 {
+	refreshTokens, err := s.tokens.DeleteExpiredRefreshTokens(ctx, now.Add(-refreshTokenRetentionPeriod))
+	if err != nil {
+		logger.Error("failed to clean expired oauth refresh tokens", slog.Any("error", err))
+		return
+	}
+
+	if deviceAuthorisations > 0 || authorizationRequests > 0 || unusedDCRClients > 0 || refreshTokens > 0 {
 		logger.Debug(
 			"cleaned expired oauth records",
 			slog.Int("device_authorizations", deviceAuthorisations),
 			slog.Int("authorization_requests", authorizationRequests),
 			slog.Int("unused_dcr_clients", unusedDCRClients),
+			slog.Int("refresh_tokens", refreshTokens),
 		)
 	}
 }
@@ -235,6 +247,16 @@ func (s *Service) authorizationCodeConsentURL(requestID string) string {
 	return u.String()
 }
 
+func (s *Service) LoginURL() string {
+	base := s.cfg.OAuthAuthorisationLoginURL
+	if !base.IsAbs() || base.Host == "" {
+		base = s.cfg.PublicWebAddress
+		base.Path = strings.TrimRight(base.Path, "/") + "/login"
+	}
+
+	return base.String()
+}
+
 func b64url(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
@@ -245,6 +267,35 @@ func randomToken(n int) (string, error) {
 		return "", err
 	}
 	return b64url(b), nil
+}
+
+// userCodeAlphabet is Crockford's base32 alphabet. It excludes the visually
+// ambiguous letters I, L, O, and U; normalizeCode accepts I/L and O as aliases
+// for the digits 1 and 0 when a user transcribes a code.
+const userCodeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+var userCodeAliases = strings.NewReplacer(
+	"O", "0",
+	"I", "1",
+	"L", "1",
+)
+
+// generateUserCode produces an 8-character user code formatted as XXXX-XXXX
+// from userCodeAlphabet, providing exactly 40 bits of entropy. 256 is an exact
+// multiple of len(userCodeAlphabet) (32), so masking a random byte to 5 bits
+// introduces no modulo bias.
+func generateUserCode() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+
+	out := make([]byte, 8)
+	for i, v := range b {
+		out[i] = userCodeAlphabet[v&0x1F]
+	}
+
+	return string(out[:4]) + "-" + string(out[4:]), nil
 }
 
 func hashString(v string) string {
@@ -266,5 +317,30 @@ func contains(in []string, v string) bool {
 }
 
 func normalizeCode(v string) string {
-	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(v), "-", ""))
+	normalized := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(v), "-", ""))
+
+	return userCodeAliases.Replace(normalized)
+}
+
+func parseUserCode(v string) (string, bool) {
+	// Bound work before trimming, case folding, or removing separators. The
+	// canonical representation is only eight bytes; the extra room permits
+	// harmless surrounding whitespace and separators without accepting an
+	// arbitrarily large value at this low-entropy lookup boundary.
+	if len(v) > maxUserCodeInputLength {
+		return "", false
+	}
+
+	normalized := normalizeCode(v)
+	if len(normalized) != 8 {
+		return "", false
+	}
+
+	for _, c := range normalized {
+		if !strings.ContainsRune(userCodeAlphabet, c) {
+			return "", false
+		}
+	}
+
+	return normalized, true
 }

@@ -129,8 +129,7 @@ func TestThreadCacheWithReplies(t *testing.T) {
 
 			etag1 := threadGet1.HTTPResponse.Header.Get("ETag")
 			r.NotEmpty(etag1, "ETag header should be present")
-			lastModified1Header := threadGet1.HTTPResponse.Header.Get("Last-Modified")
-			r.NotEmpty(lastModified1Header, "Last-Modified header should be present for backward compatibility")
+			r.Empty(threadGet1.HTTPResponse.Header.Get("Last-Modified"), "ETag is the sole conditional validator")
 
 			threadGet304 := tests.AssertRequest(cl.ThreadGetWithResponse(root, threadCreate.JSON200.Slug, &openapi.ThreadGetParams{}, func(ctx context.Context, req *http.Request) error {
 				req.Header.Set("If-None-Match", etag1)
@@ -148,7 +147,7 @@ func TestThreadCacheWithReplies(t *testing.T) {
 			}))(t, http.StatusOK)
 			r.NotNil(threadGet200.JSON200, "should return 200 with body after cache invalidation")
 			r.Len(threadGet200.JSON200.Replies.Replies, 1, "thread should have the reply")
-			a.Equal("<body><p>This is a test reply</p></body>", threadGet200.JSON200.Replies.Replies[0].Body)
+			a.Equal("<body><p>This is a test reply</p></body>", tests.StripBlockIDs(threadGet200.JSON200.Replies.Replies[0].Body))
 		}))
 	}))
 }
@@ -194,12 +193,11 @@ func TestThreadCacheWithReplyUpdate(t *testing.T) {
 
 			threadGet1 := tests.AssertRequest(cl.ThreadGetWithResponse(root, threadCreate.JSON200.Slug, nil))(t, http.StatusOK)
 			r.Len(threadGet1.JSON200.Replies.Replies, 1)
-			a.Equal("<body><p>Original reply content</p></body>", threadGet1.JSON200.Replies.Replies[0].Body)
+			a.Equal("<body><p>Original reply content</p></body>", tests.StripBlockIDs(threadGet1.JSON200.Replies.Replies[0].Body))
 
 			etag1 := threadGet1.HTTPResponse.Header.Get("ETag")
 			r.NotEmpty(etag1, "ETag header should be present")
-			lastModified1Header := threadGet1.HTTPResponse.Header.Get("Last-Modified")
-			r.NotEmpty(lastModified1Header, "Last-Modified header should be present for backward compatibility")
+			r.Empty(threadGet1.HTTPResponse.Header.Get("Last-Modified"), "ETag is the sole conditional validator")
 
 			threadGet304 := tests.AssertRequest(cl.ThreadGetWithResponse(root, threadCreate.JSON200.Slug, &openapi.ThreadGetParams{}, func(ctx context.Context, req *http.Request) error {
 				req.Header.Set("If-None-Match", etag1)
@@ -218,7 +216,7 @@ func TestThreadCacheWithReplyUpdate(t *testing.T) {
 			}))(t, http.StatusOK)
 			r.NotNil(threadGet200.JSON200, "should return 200 with body after cache invalidation from reply update")
 			r.Len(threadGet200.JSON200.Replies.Replies, 1, "thread should have the reply")
-			a.Equal("<body><p>Updated reply content</p></body>", threadGet200.JSON200.Replies.Replies[0].Body)
+			a.Equal("<body><p>Updated reply content</p></body>", tests.StripBlockIDs(threadGet200.JSON200.Replies.Replies[0].Body))
 		}))
 	}))
 }

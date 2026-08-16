@@ -90,7 +90,7 @@ func TestPluginLifecycle(t *testing.T) {
 
 			status1, err := getResp1.JSON200.Status.AsPluginStatusInactive()
 			r.NoError(err)
-			a.Equal(openapi.Inactive, status1.ActiveState)
+			a.Equal(openapi.PluginStatusInactiveActiveStateInactive, status1.ActiveState)
 			t.Logf("plugin status: %s", status1.ActiveState)
 
 			pluginIDxid, _ := xid.FromString(pluginID)
@@ -133,7 +133,7 @@ func TestPluginLifecycle(t *testing.T) {
 
 			status3, err := inactiveResp.JSON200.Status.AsPluginStatusInactive()
 			r.NoError(err)
-			a.Equal(openapi.Inactive, status3.ActiveState)
+			a.Equal(openapi.PluginStatusInactiveActiveStateInactive, status3.ActiveState)
 			t.Logf("plugin deactivated: %s", status3.ActiveState)
 
 			state2 := sess2.GetReportedState()

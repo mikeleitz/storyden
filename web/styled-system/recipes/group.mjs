@@ -1,7 +1,7 @@
 import { memo, splitProps } from '../helpers.mjs';
 import { createRecipe, mergeRecipes } from './create-recipe.mjs';
 
-const groupFn = /* @__PURE__ */ createRecipe('group', {
+const groupFn = /* @__PURE__ */ createRecipe('ui-group', {
   "orientation": "horizontal"
 }, [
   {
@@ -46,9 +46,6 @@ const groupVariantMap = {
     "vertical"
   ],
   "attached": [
-    "true"
-  ],
-  "grow": [
     "true"
   ]
 }

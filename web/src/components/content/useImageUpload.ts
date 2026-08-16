@@ -1,5 +1,4 @@
-import { assetUpload } from "src/api/openapi-client/assets";
-
+import { assetUpload } from "@/api/openapi-client/assets";
 import { getAssetUploadMutationKey } from "@/api/openapi-client/assets";
 import { APIError, Asset, AssetUploadParams } from "@/api/openapi-schema";
 import { API_ADDRESS } from "@/config";

@@ -2,6 +2,7 @@ package account_update
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Southclaws/fault"
 	"github.com/Southclaws/fault/fctx"
@@ -50,6 +51,7 @@ func (u *Updater) Update(ctx context.Context, id account.AccountID, params Parti
 	opts := []account_writer.Mutation{}
 
 	if v, ok := params.Handle.Get(); ok {
+		v = strings.ToLower(v)
 		if err := account.ValidateHandle(ctx, v); err != nil {
 			return nil, err
 		}
@@ -81,12 +83,16 @@ func (u *Updater) Update(ctx context.Context, id account.AccountID, params Parti
 		opts = append(opts, account_writer.SetMetadata(v))
 	}
 
-	err := u.profileCache.Invalidate(ctx, xid.ID(id))
-	if err != nil {
+	if err := u.profileCache.Invalidate(ctx, xid.ID(id)); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
 	acc, err := u.writer.Update(ctx, id, opts...)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	err = u.profileCache.Invalidate(ctx, xid.ID(id))
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}

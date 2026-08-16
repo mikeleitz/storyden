@@ -2,15 +2,17 @@
 package fetcher
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/Southclaws/fault"
 	"github.com/Southclaws/fault/fctx"
 	"github.com/Southclaws/fault/ftag"
-	"github.com/Southclaws/opt"
 
 	"github.com/Southclaws/storyden/app/resources/asset"
 	"github.com/Southclaws/storyden/app/resources/datagraph"
@@ -21,10 +23,19 @@ import (
 	"github.com/Southclaws/storyden/app/resources/message"
 	"github.com/Southclaws/storyden/app/services/asset/asset_upload"
 	"github.com/Southclaws/storyden/app/services/link/scrape"
+	"github.com/Southclaws/storyden/internal/infrastructure/httpsafe"
 	"github.com/Southclaws/storyden/internal/infrastructure/pubsub"
 )
 
-var errEmptyLink = fault.New("empty link")
+var (
+	errEmptyLink     = fault.New("empty link")
+	errAssetTooLarge = fault.New("linked asset exceeds maximum size")
+)
+
+const (
+	assetFetchTimeout  = 30 * time.Second
+	assetFetchMaxBytes = 8 * 1024 * 1024
+)
 
 type Fetcher struct {
 	logger   *slog.Logger
@@ -33,6 +44,7 @@ type Fetcher struct {
 	lr       *link_writer.LinkWriter
 	sc       scrape.Scraper
 	bus      *pubsub.Bus
+	client   *http.Client
 }
 
 func New(
@@ -50,14 +62,11 @@ func New(
 		lr:       lr,
 		sc:       sc,
 		bus:      bus,
+		client:   httpsafe.NewClient(httpsafe.Config{Timeout: assetFetchTimeout}),
 	}
 }
 
-type Options struct {
-	ContentFill opt.Optional[asset.ContentFillCommand]
-}
-
-func (s *Fetcher) Fetch(ctx context.Context, u url.URL, opts Options) (*link_ref.LinkRef, error) {
+func (s *Fetcher) Fetch(ctx context.Context, u url.URL) (*link_ref.LinkRef, error) {
 	if u.String() == "" {
 		return nil, fault.Wrap(errEmptyLink, fctx.With(ctx), ftag.With(ftag.InvalidArgument))
 	}
@@ -157,23 +166,50 @@ func (s *Fetcher) ScrapeAndStore(ctx context.Context, u url.URL) (*link_ref.Link
 }
 
 func (s *Fetcher) CopyAsset(ctx context.Context, url string) (*asset.Asset, error) {
-	resp, err := http.Get(url)
+	body, err := fetchBounded(ctx, s.client, url, assetFetchMaxBytes)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
+
+	// TODO: Better naming???
+	name := mark.Slugify(url)
+
+	a, err := s.uploader.Upload(ctx, bytes.NewReader(body), int64(len(body)), asset.NewFilename(name), asset_upload.Options{})
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	return a, nil
+}
+
+func fetchBounded(ctx context.Context, client *http.Client, url string, maxBytes int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		ctx = fctx.WithMeta(ctx, "status", resp.Status)
 		return nil, fault.Wrap(fault.New("failed to get"), fctx.With(ctx))
 	}
 
-	// TODO: Better naming???
-	name := mark.Slugify(url)
+	if resp.ContentLength > maxBytes {
+		return nil, fault.Wrap(errAssetTooLarge, fctx.With(ctx))
+	}
 
-	a, err := s.uploader.Upload(ctx, resp.Body, resp.ContentLength, asset.NewFilename(name), asset_upload.Options{})
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
+	if int64(len(body)) > maxBytes {
+		return nil, fault.Wrap(errAssetTooLarge, fctx.With(ctx))
+	}
 
-	return a, nil
+	return body, nil
 }

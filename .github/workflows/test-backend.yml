@@ -2,10 +2,11 @@ name: Test backend
 
 on:
   push:
-    paths-ignore:
+    branches:
+      - main
+    paths-ignore: &ignored_paths
       - "home/**"
       - "web/**"
-      - ".github/**"
       - ".vscode/**"
       - "*.md"
       - "docker/**"
@@ -17,6 +18,9 @@ on:
       - ".nvmrc"
       - ".vercelignore"
       - "Taskfile.yml"
+
+  pull_request:
+    paths-ignore: *ignored_paths
 
 jobs:
   backend-test-postgres:
@@ -44,7 +48,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.26.5"
           cache: true
           cache-dependency-path: "**/go.sum"
 
@@ -57,7 +61,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.26.5"
           cache: true
           cache-dependency-path: "**/go.sum"
       - run: go run ./cmd/migrate
@@ -71,7 +75,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.26.5"
           cache: true
           cache-dependency-path: "**/go.sum"
       - run: go run ./cmd/migrate

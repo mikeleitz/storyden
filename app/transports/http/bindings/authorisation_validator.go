@@ -13,6 +13,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/Southclaws/storyden/app/resources/account/account_querier"
+	"github.com/Southclaws/storyden/app/resources/account/authentication/access_key"
 	"github.com/Southclaws/storyden/app/resources/rbac"
 	"github.com/Southclaws/storyden/app/services/authentication/session"
 	"github.com/Southclaws/storyden/app/transports/http/bindings/openapi_rbac"
@@ -20,6 +21,15 @@ import (
 
 type Authorisation struct {
 	accountQuery *account_querier.Querier
+}
+
+// personalAccessKeyOnlyOperations lists operations where an access key is an
+// accepted security scheme but only a member's own personal key may be used,
+// not a plugin/robot's bot key.
+var personalAccessKeyOnlyOperations = map[string]bool{
+	"OAuthAuthorise":              true,
+	"OAuthAuthoriseConsent":       true,
+	"OAuthAuthoriseConsentSubmit": true,
 }
 
 func newAuthorisation(aq *account_querier.Querier) *Authorisation {
@@ -54,9 +64,29 @@ func (i *Authorisation) validator(oapictx context.Context, ai *openapi3filter.Au
 		}
 	}
 
+	// Only a member's own personal access key may stand in for a browser
+	// session on these operations; a plugin/robot's bot key must not be able
+	// to mint new OAuth grants on the account's behalf.
+	if requestSecurityScheme == "access_key" && personalAccessKeyOnlyOperations[op] {
+		kind, ok := session.GetAccessKeyKind(ctx).Get()
+		if !ok || kind != access_key.AccessKeyKindPersonal {
+			return fault.New("bot access keys cannot authorise OAuth grants", fctx.With(ctx), ftag.With(ftag.PermissionDenied))
+		}
+	}
+
 	sessionRequired, perm := GetPermissionForOperation(op)
 	if perm == nil {
-		// No specific permission required, just need a session.
+		// No specific permission required, just need a session. Suspension must
+		// still be enforced here otherwise suspended accounts could perform any
+		// operation that maps to no specific permission (creating content,
+		// updating their account, authorising OAuth clients, etc.)
+		if sessionRequired {
+			if acc, ok := session.GetOptAccount(ctx).Get(); ok {
+				if err := acc.RejectSuspended(); err != nil {
+					return fault.Wrap(err, fctx.With(ctx))
+				}
+			}
+		}
 		return nil
 	}
 

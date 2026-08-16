@@ -1,11 +1,37 @@
 import { buildRequest, buildResult } from "../src/api/common";
 import { getAccountAddRoleMutationKey } from "../src/api/openapi-client/accounts";
+import { getAdminSettingsUpdateMutationKey } from "../src/api/openapi-client/admin";
 import { getCategoryCreateMutationKey } from "../src/api/openapi-client/categories";
+import { getNodeCreateMutationKey } from "../src/api/openapi-client/nodes";
+import {
+  getPluginAddMutationKey,
+  getPluginDeleteMutationKey,
+} from "../src/api/openapi-client/plugins";
+import { getReplyCreateMutationKey } from "../src/api/openapi-client/replies";
+import {
+  getRobotCreateMutationKey,
+  getRobotDeleteMutationKey,
+  getRobotGetKey,
+  getRobotProviderUpdateMutationKey,
+} from "../src/api/openapi-client/robots";
 import { getThreadCreateMutationKey } from "../src/api/openapi-client/threads";
 import {
   AccountUpdateOKResponse,
+  AdminSettingsUpdateBody,
+  AdminSettingsUpdateOKResponse,
   CategoryCreateBody,
   CategoryCreateOKResponse,
+  NodeCreateBody,
+  NodeCreateOKResponse,
+  PluginGetOKResponse,
+  PluginInitialProps,
+  ReplyCreateBody,
+  ReplyCreateOKResponse,
+  RobotCreateBody,
+  RobotCreateOKResponse,
+  RobotGetOKResponse,
+  RobotProviderGetOKResponse,
+  RobotProviderUpdateBody,
   ThreadCreateBody,
   ThreadCreateOKResponse,
 } from "../src/api/openapi-schema";
@@ -15,12 +41,33 @@ export type AccessKeyClient = {
     accountHandle: string,
     roleId: string,
   ) => Promise<AccountUpdateOKResponse>;
+  adminSettingsUpdate: (
+    adminSettingsUpdateBody: AdminSettingsUpdateBody,
+  ) => Promise<AdminSettingsUpdateOKResponse>;
   categoryCreate: (
     categoryCreateBody: CategoryCreateBody,
   ) => Promise<CategoryCreateOKResponse>;
   threadCreate: (
     threadCreateBody: ThreadCreateBody,
   ) => Promise<ThreadCreateOKResponse>;
+  replyCreate: (
+    threadSlug: string,
+    replyCreateBody: ReplyCreateBody,
+  ) => Promise<ReplyCreateOKResponse>;
+  nodeCreate: (nodeCreateBody: NodeCreateBody) => Promise<NodeCreateOKResponse>;
+  pluginAdd: (
+    pluginInitialProps: PluginInitialProps,
+  ) => Promise<PluginGetOKResponse>;
+  pluginDelete: (pluginInstanceId: string) => Promise<void>;
+  robotCreate: (
+    robotCreateBody: RobotCreateBody,
+  ) => Promise<RobotCreateOKResponse>;
+  robotDelete: (robotId: string) => Promise<void>;
+  robotGet: (robotId: string) => Promise<RobotGetOKResponse>;
+  robotProviderUpdate: (
+    provider: string,
+    robotProviderUpdateBody: RobotProviderUpdateBody,
+  ) => Promise<RobotProviderGetOKResponse>;
 };
 
 export function createAccessKeyClient(accessKey: string): AccessKeyClient {
@@ -32,12 +79,20 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         method: "PUT",
       });
     },
+    adminSettingsUpdate: async (adminSettingsUpdateBody) => {
+      return await requestWithAccessKey<AdminSettingsUpdateOKResponse>({
+        accessKey,
+        key: getAdminSettingsUpdateMutationKey(),
+        method: "PATCH",
+        body: adminSettingsUpdateBody,
+      });
+    },
     categoryCreate: async (categoryCreateBody) => {
       return await requestWithAccessKey<CategoryCreateOKResponse>({
         accessKey,
         key: getCategoryCreateMutationKey(),
         method: "POST",
-        data: categoryCreateBody,
+        body: categoryCreateBody,
       });
     },
     threadCreate: async (threadCreateBody) => {
@@ -45,7 +100,68 @@ export function createAccessKeyClient(accessKey: string): AccessKeyClient {
         accessKey,
         key: getThreadCreateMutationKey(),
         method: "POST",
-        data: threadCreateBody,
+        body: threadCreateBody,
+      });
+    },
+    replyCreate: async (threadSlug, replyCreateBody) => {
+      return await requestWithAccessKey<ReplyCreateOKResponse>({
+        accessKey,
+        key: getReplyCreateMutationKey(threadSlug),
+        method: "POST",
+        body: replyCreateBody,
+      });
+    },
+    nodeCreate: async (nodeCreateBody) => {
+      return await requestWithAccessKey<NodeCreateOKResponse>({
+        accessKey,
+        key: getNodeCreateMutationKey(),
+        method: "POST",
+        body: nodeCreateBody,
+      });
+    },
+    pluginAdd: async (pluginInitialProps) => {
+      return await requestWithAccessKey<PluginGetOKResponse>({
+        accessKey,
+        key: getPluginAddMutationKey(),
+        method: "POST",
+        body: pluginInitialProps,
+      });
+    },
+    pluginDelete: async (pluginInstanceId) => {
+      await requestWithAccessKey<void>({
+        accessKey,
+        key: getPluginDeleteMutationKey(pluginInstanceId),
+        method: "DELETE",
+      });
+    },
+    robotCreate: async (robotCreateBody) => {
+      return await requestWithAccessKey<RobotCreateOKResponse>({
+        accessKey,
+        key: getRobotCreateMutationKey(),
+        method: "POST",
+        body: robotCreateBody,
+      });
+    },
+    robotDelete: async (robotId) => {
+      await requestWithAccessKey<void>({
+        accessKey,
+        key: getRobotDeleteMutationKey(robotId),
+        method: "DELETE",
+      });
+    },
+    robotGet: async (robotId) => {
+      return await requestWithAccessKey<RobotGetOKResponse>({
+        accessKey,
+        key: getRobotGetKey(robotId),
+        method: "GET",
+      });
+    },
+    robotProviderUpdate: async (provider, robotProviderUpdateBody) => {
+      return await requestWithAccessKey<RobotProviderGetOKResponse>({
+        accessKey,
+        key: getRobotProviderUpdateMutationKey(provider),
+        method: "PATCH",
+        body: robotProviderUpdateBody,
       });
     },
   };
@@ -55,24 +171,23 @@ async function requestWithAccessKey<T>({
   accessKey,
   key,
   method,
-  data,
+  body,
 }: {
   accessKey: string;
   key: readonly [string];
-  method: "POST" | "PUT";
-  data?: unknown;
+  method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+  body?: unknown;
 }): Promise<T> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessKey}`,
   };
-  if (data !== undefined) {
+  if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
-  const request = buildRequest({
-    url: key[0],
+  const request = buildRequest(key[0], {
     method,
-    data,
+    body,
     headers,
   });
 

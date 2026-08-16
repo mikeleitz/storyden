@@ -8,12 +8,10 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -41,14 +39,6 @@ const (
 	oauthGrantClientCredentials = "client_credentials"
 	oauthGrantDeviceCode        = "urn:ietf:params:oauth:grant-type:device_code"
 )
-
-var errNilResponse = errors.New("nil oauth token response")
-
-type refreshResult struct {
-	status  int
-	errCode string
-	err     error
-}
 
 type oauthTokenRequest struct {
 	GrantType    string
@@ -186,28 +176,6 @@ func clientSecretHash(t *testing.T, secret string) string {
 	return hash
 }
 
-func authorizeCode(t *testing.T, ctx context.Context, ts *httptest.Server, session openapi.RequestEditorFn, clientID, redirectURI, scope, verifier string) string {
-	t.Helper()
-
-	location := authorizeRedirect(t, ctx, ts, session, authorizeRequest{
-		ClientID:            clientID,
-		RedirectURI:         redirectURI,
-		Scope:               scope,
-		State:               "state-" + uuid.NewString(),
-		CodeChallenge:       codeChallenge(verifier),
-		CodeChallengeMethod: "S256",
-	})
-
-	u, err := url.Parse(location)
-	require.NoError(t, err)
-	require.Equal(t, redirectURI, u.Scheme+"://"+u.Host+u.Path)
-
-	code := u.Query().Get("code")
-	require.NotEmpty(t, code)
-
-	return code
-}
-
 type authorizeRequest struct {
 	ResponseType        string
 	ClientID            string
@@ -288,43 +256,6 @@ func authorizeHTTPResponse(t *testing.T, ctx context.Context, ts *httptest.Serve
 	return resp
 }
 
-func refreshTwiceConcurrently(t *testing.T, ctx context.Context, cl *openapi.ClientWithResponses, clientID, clientSecret, refreshToken string) []refreshResult {
-	t.Helper()
-
-	var wg sync.WaitGroup
-	out := make([]refreshResult, 2)
-
-	for i := range out {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			resp, err := oauthToken(t, ctx, cl, oauthTokenRequest{
-				GrantType:    oauthGrantRefreshToken,
-				ClientId:     clientID,
-				ClientSecret: &clientSecret,
-				RefreshToken: &refreshToken,
-			})
-			if err != nil {
-				out[i].err = err
-				return
-			}
-			if resp == nil {
-				out[i].err = errNilResponse
-				return
-			}
-
-			out[i].status = resp.StatusCode()
-			if resp.JSON400 != nil {
-				out[i].errCode = resp.JSON400.Error
-			}
-		}(i)
-	}
-
-	wg.Wait()
-
-	return out
-}
-
 func parseClaims(t *testing.T, raw string) jwt.MapClaims {
 	t.Helper()
 
@@ -349,6 +280,19 @@ func bearer(token string) openapi.RequestEditorFn {
 
 func standardScopes() []string {
 	return []string{"openid", "profile", "email", "offline_access"}
+}
+
+func differentDeviceUserCode(t *testing.T, code string) string {
+	t.Helper()
+	require.Len(t, code, 9)
+	require.Equal(t, byte('-'), code[4])
+
+	replacement := byte('0')
+	if code[0] == replacement {
+		replacement = '1'
+	}
+
+	return string(replacement) + code[1:]
 }
 
 func ptr[T any](v T) *T {

@@ -1,6 +1,5 @@
-import { Node } from "src/api/openapi-schema";
-
-import { CardGrid, CardRows } from "@/components/ui/rich-card";
+import { Node } from "@/api/openapi-schema";
+import { CardGrid, CardRows } from "@/components/ui/surface";
 import { RichCardVariantProps } from "@/styled-system/recipes";
 
 import { NodeCard, NodeCardContext } from "./NodeCard";

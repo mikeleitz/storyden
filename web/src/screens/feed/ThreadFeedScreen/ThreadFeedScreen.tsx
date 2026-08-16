@@ -1,13 +1,12 @@
 "use client";
 
-import { Unready } from "src/components/site/Unready";
-
 import { type Account } from "@/api/openapi-schema";
 import { useSession } from "@/auth";
 import { FeedEmptyState } from "@/components/feed/FeedEmptyState";
 import { QuickShare } from "@/components/feed/QuickShare/QuickShare";
 import { ThreadReferenceCard } from "@/components/post/ThreadCard";
 import { PaginationControls } from "@/components/site/PaginationControls/PaginationControls";
+import { Unready } from "@/components/site/Unready";
 import { type Settings } from "@/lib/settings/settings";
 import { LStack, VStack } from "@/styled-system/jsx";
 import { lstack } from "@/styled-system/patterns";
@@ -75,7 +74,7 @@ export function ThreadFeed(props: Props & { hideCategoryBadge?: boolean }) {
           onClick={handlePageChange}
         />
       )}
-      <ol className={lstack()}>
+      <ol className={lstack({ gap: "4" })}>
         {data.threads.map((t) => {
           return (
             <ThreadReferenceCard

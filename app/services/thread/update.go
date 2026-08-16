@@ -21,7 +21,6 @@ import (
 	"github.com/Southclaws/storyden/app/resources/tag/tag_ref"
 	"github.com/Southclaws/storyden/app/resources/visibility"
 	"github.com/Southclaws/storyden/app/services/authentication/session"
-	"github.com/Southclaws/storyden/app/services/link/fetcher"
 	"github.com/Southclaws/storyden/app/services/moderation/checker"
 	"github.com/Southclaws/storyden/lib/plugin/rpc"
 )
@@ -50,6 +49,16 @@ func (s *service) Update(ctx context.Context, threadID post.ID, partial Partial)
 
 	if err := authoriseMutation(ctx, partial); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	if c, ok := partial.Content.Get(); ok {
+		prev := thr.Content
+		stable, err := datagraph.NewRichTextWithChangedBlocks(prev, c)
+		if err != nil {
+			s.logger.Warn("block ID assignment failed", "error", err.Error())
+		} else {
+			partial.Content = opt.New(stable.Content)
+		}
 	}
 
 	oldVisibility := thr.Visibility
@@ -91,7 +100,7 @@ func (s *service) Update(ctx context.Context, threadID post.ID, partial Partial)
 	}
 
 	if u, ok := partial.URL.Get(); ok {
-		ln, err := s.fetcher.Fetch(ctx, u, fetcher.Options{})
+		ln, err := s.fetcher.Fetch(ctx, u)
 		if err == nil {
 			opts = append(opts, thread_writer.WithLink(xid.ID(ln.ID)))
 		}
@@ -103,6 +112,10 @@ func (s *service) Update(ctx context.Context, threadID post.ID, partial Partial)
 
 	thr, err = s.threadWriter.Update(ctx, threadID, opts...)
 	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	if err := s.cache.Invalidate(ctx, xid.ID(threadID)); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 

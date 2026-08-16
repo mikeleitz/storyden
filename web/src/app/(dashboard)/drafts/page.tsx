@@ -1,6 +1,4 @@
-import { Visibility } from "src/api/openapi-schema";
-import { DraftListScreen } from "src/screens/drafts/DraftListScreen";
-
+import { Visibility } from "@/api/openapi-schema";
 import { nodeList } from "@/api/openapi-server/nodes";
 import { threadList } from "@/api/openapi-server/threads";
 import { getServerSession } from "@/auth/server-session";
@@ -9,6 +7,7 @@ import {
   UnreadyBanner,
 } from "@/components/site/Unready";
 import { getSettings } from "@/lib/settings/settings-server";
+import { DraftListScreen } from "@/screens/drafts/DraftListScreen";
 
 export default async function Page() {
   try {

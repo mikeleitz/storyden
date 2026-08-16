@@ -1,0 +1,97 @@
+$schema: http://json-schema.org/draft-07/schema#
+$id: ToolLibraryPageTree
+x-storyden:
+  toolsets:
+    - system.library
+x-storyden-tool:
+  title: List Library Pages
+  role: READ_PUBLISHED_LIBRARY
+  annotations:
+    readOnlyHint: true
+    destructiveHint: false
+    idempotentHint: true
+    openWorldHint: false
+title: library_page_list
+description: List library pages by hierarchy and workflow visibility.
+type: object
+required:
+  - input
+  - output
+properties:
+  input:
+    $ref: "#/definitions/ToolLibraryPageTreeInput"
+  output:
+    $ref: "#/definitions/ToolLibraryPageTreeOutput"
+definitions:
+  ToolLibraryPageTreeInput:
+    type: object
+    properties:
+      depth:
+        type: integer
+        minimum: -1
+        description: Maximum depth to traverse (-1 for unlimited, 0 for root only, 1 for
+          root + children, etc.)
+      visibility:
+        type: string
+        enum:
+          - draft
+          - review
+          - published
+        description: Limit pages to one workflow visibility.
+    additionalProperties: false
+  ToolLibraryPageTreeOutput:
+    type: object
+    required:
+      - pages
+      - results
+    properties:
+      pages:
+        type: array
+        description: Pages in hierarchical order for selecting a page to inspect.
+        items:
+          $ref: "#/definitions/LibraryPageTreeNode"
+      results:
+        type: integer
+        description: Number of pages returned.
+    additionalProperties: false
+  LibraryPageTreeNode:
+    type: object
+    required:
+      - id
+      - slug
+      - name
+      - description
+      - browser_url
+      - visibility
+    properties:
+      browser_url:
+        type: string
+        description: Browser URL for this resource. Always present this as a Markdown link when showing results to the user.
+      id:
+        type: string
+        description: Unique identifier for the page
+      slug:
+        type: string
+        description: URL-friendly identifier for the page
+      name:
+        type: string
+        description: Display name of the page
+      description:
+        type: string
+        description: Brief description of the page
+      parent:
+        type: string
+        description: Slug of the parent page (omitted for root pages)
+      tags:
+        type: array
+        description: Tags associated with this page
+        items:
+          type: string
+      visibility:
+        type: string
+        enum:
+          - draft
+          - review
+          - published
+        description: Current publishing workflow state.
+    additionalProperties: false

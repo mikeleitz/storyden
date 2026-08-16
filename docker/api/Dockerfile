@@ -2,7 +2,7 @@
 # BACKEND API LAYER
 #
 
-FROM golang:1.25-alpine AS api-builder
+FROM golang:1.26.5-alpine AS api-builder
 
 WORKDIR /build
 
@@ -15,6 +15,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 
 COPY ./app ./app
 COPY ./lib ./lib
+COPY ./sdk ./sdk
 COPY ./cmd ./cmd
 COPY ./internal ./internal
 

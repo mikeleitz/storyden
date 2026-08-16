@@ -36,6 +36,7 @@ const (
 	cmdProcessExited
 
 	gracefulStopTimeout = 3 * time.Second
+	forcedStopTimeout   = gracefulStopTimeout + 2*time.Second
 	deploymentMarker    = ".sdxlock"
 )
 
@@ -133,7 +134,11 @@ func (r *localRuntime) Start(ctx context.Context) error {
 }
 
 func (r *localRuntime) Stop(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, forcedStopTimeout)
+	defer cancel()
+
 	respch := make(chan error, 1)
+	r.logger.Debug("runtime stop requested")
 
 	select {
 	case r.commandCh <- command{typ: cmdStop, respch: respch}:
@@ -143,8 +148,10 @@ func (r *localRuntime) Stop(ctx context.Context) error {
 
 	select {
 	case err := <-respch:
+		r.logger.Debug("runtime stop completed", slog.Any("error", err))
 		return err
 	case <-ctx.Done():
+		r.logger.Warn("runtime stop timed out", slog.Any("error", ctx.Err()))
 		return ctx.Err()
 	}
 }
@@ -325,13 +332,12 @@ func (r *localRuntime) stopProcess(cmd *exec.Cmd) {
 
 	r.logger.Info("sent interrupt signal to plugin process")
 
-	proc := cmd.Process
 	go func() {
 		timer := time.NewTimer(gracefulStopTimeout)
 		defer timer.Stop()
 		<-timer.C
 
-		if err := proc.Kill(); err != nil {
+		if err := cmd.Process.Kill(); err != nil {
 			if !errors.Is(err, os.ErrProcessDone) {
 				r.logger.Warn("failed to kill process after graceful shutdown timeout", slog.Any("error", err))
 			}
@@ -358,6 +364,9 @@ func (r *localRuntime) runProcess(ctx context.Context) {
 	r.commandCh <- command{typ: cmdProcessStarted, cmd: cmd}
 
 	waitErr := cmd.Wait()
+	r.logger.Debug("plugin process wait returned",
+		slog.Any("wait_error", waitErr),
+		slog.Any("context_error", ctx.Err()))
 
 	if ctx.Err() != nil {
 		r.logger.Info("plugin stopped")
@@ -453,7 +462,7 @@ func (r *localRuntime) ensureExtractedSDXArchive() (string, error) {
 	}
 
 	markerPath := filepath.Join(pluginDir, deploymentMarker)
-	if isLocalDeploymentReady(markerPath, hash) {
+	if isLocalDeploymentReady(markerPath, hash, pluginDir, r.manifest.Metadata.Command) {
 		r.deployedArchiveHash = hash
 		return pluginDir, nil
 	}
@@ -476,13 +485,40 @@ func archiveHash(bin []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func isLocalDeploymentReady(markerPath, expectedHash string) bool {
+func isLocalDeploymentReady(markerPath, expectedHash, workdir, command string) bool {
 	b, err := os.ReadFile(markerPath)
 	if err != nil {
 		return false
 	}
 
-	return strings.TrimSpace(string(b)) == expectedHash
+	if strings.TrimSpace(string(b)) != expectedHash {
+		return false
+	}
+
+	if path, ok := commandPathInWorkdir(workdir, command); ok {
+		if _, err := os.Stat(path); err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func commandPathInWorkdir(workdir, command string) (string, bool) {
+	if command == "" {
+		return "", false
+	}
+	if filepath.IsAbs(command) {
+		return command, true
+	}
+	if !strings.Contains(command, string(os.PathSeparator)) && !strings.Contains(command, "/") {
+		return "", false
+	}
+	path, err := joinWithin(workdir, command)
+	if err != nil {
+		return "", false
+	}
+	return path, true
 }
 
 func extractSDXArchiveToDir(bin []byte, workdir string) error {

@@ -25,6 +25,14 @@ func (s *Mutator) Create(
 	parentID post.ID,
 	partial Partial,
 ) (*reply.Reply, error) {
+	if content, ok := partial.Content.Get(); ok {
+		stable, err := datagraph.NewRichTextWithNewBlocks(content)
+		if err != nil {
+			return nil, fault.Wrap(err, fctx.With(ctx))
+		}
+		partial.Content = opt.New(stable.Content)
+	}
+
 	opts := partial.Opts()
 	opts = append(opts, reply_writer.WithVisibility(visibility.VisibilityPublished))
 
@@ -35,6 +43,10 @@ func (s *Mutator) Create(
 	p, err := s.replyWriter.Create(ctx, authorID, parentID, opts...)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx), fmsg.With("failed to create reply post in thread"))
+	}
+
+	if err := s.cache.Invalidate(ctx, xid.ID(parentID)); err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx), fmsg.With("failed to invalidate thread cache"))
 	}
 
 	wasMovedToReview := false
@@ -51,6 +63,10 @@ func (s *Mutator) Create(
 			}
 			p = updatedReply
 			wasMovedToReview = true
+
+			if err := s.cache.Invalidate(ctx, xid.ID(parentID)); err != nil {
+				return nil, fault.Wrap(err, fctx.With(ctx), fmsg.With("failed to invalidate thread cache"))
+			}
 		}
 	}
 

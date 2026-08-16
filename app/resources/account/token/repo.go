@@ -11,8 +11,10 @@ import (
 	"github.com/Southclaws/storyden/internal/infrastructure/cache"
 )
 
+const cachePrefix = "account:session:"
+
 type Repository interface {
-	Issue(context.Context, account.AccountID) (*Session, error)
+	Issue(context.Context, account.AccountID) (*Issued, error)
 	Revoke(context.Context, Token) error
 	Validate(context.Context, Token) (*Validated, error)
 }
@@ -29,17 +31,17 @@ func NewCachedRepository(repo Repository, store cache.Store) Repository {
 	}
 }
 
-func (r *cachedRepo) Issue(ctx context.Context, accountID account.AccountID) (*Session, error) {
-	s, err := r.repo.Issue(ctx, accountID)
+func (r *cachedRepo) Issue(ctx context.Context, accountID account.AccountID) (*Issued, error) {
+	issued, err := r.repo.Issue(ctx, accountID)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	if err := r.cache(ctx, *s); err != nil {
+	if err := r.cache(ctx, issued.Session); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	return s, nil
+	return issued, nil
 }
 
 func (r *cachedRepo) Revoke(ctx context.Context, token Token) error {
@@ -51,17 +53,27 @@ func (r *cachedRepo) Revoke(ctx context.Context, token Token) error {
 		return err
 	}
 
+	if err := r.delete(ctx, token); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (r *cachedRepo) Validate(ctx context.Context, t Token) (*Validated, error) {
 	sess, found, err := r.get(ctx, t)
 	if err != nil {
-		return nil, r.delete(ctx, t)
-	}
+		// an unreadable entry is evicted so the database decides instead
+		if delErr := r.delete(ctx, t); delErr != nil {
+			return nil, fault.Wrap(delErr, fctx.With(ctx))
+		}
+	} else if found {
+		v, err := sess.Validate()
+		if err != nil {
+			return nil, fault.Wrap(err, fctx.With(ctx))
+		}
 
-	if found {
-		return sess, nil
+		return v, nil
 	}
 
 	// Fall back to database query.
@@ -78,8 +90,8 @@ func (r *cachedRepo) Validate(ctx context.Context, t Token) (*Validated, error) 
 	return v, nil
 }
 
-func (r *cachedRepo) get(ctx context.Context, t Token) (*Validated, bool, error) {
-	raw, err := r.store.Get(ctx, t.ID.String())
+func (r *cachedRepo) get(ctx context.Context, t Token) (*Session, bool, error) {
+	raw, err := r.store.Get(ctx, cacheKey(t))
 	if err != nil {
 		// Cache miss, found=false
 		// TODO: Expose a "cache miss" error/return value and distinguish
@@ -92,12 +104,7 @@ func (r *cachedRepo) get(ctx context.Context, t Token) (*Validated, bool, error)
 		return nil, false, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	v, err := session.Validate()
-	if err != nil {
-		return nil, false, fault.Wrap(err, fctx.With(ctx))
-	}
-
-	return v, true, nil
+	return session, true, nil
 }
 
 func (r *cachedRepo) cache(ctx context.Context, s Session) error {
@@ -111,7 +118,7 @@ func (r *cachedRepo) cache(ctx context.Context, s Session) error {
 		return nil
 	}
 
-	err = r.store.Set(ctx, s.Token.String(), string(payload), ttl)
+	err = r.store.Set(ctx, cachePrefix+s.TokenHash, string(payload), ttl)
 	if err != nil {
 		return err
 	}
@@ -120,10 +127,14 @@ func (r *cachedRepo) cache(ctx context.Context, s Session) error {
 }
 
 func (r *cachedRepo) delete(ctx context.Context, token Token) error {
-	err := r.store.Delete(ctx, token.ID.String())
+	err := r.store.Delete(ctx, cacheKey(token))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func cacheKey(t Token) string {
+	return cachePrefix + t.Hash()
 }

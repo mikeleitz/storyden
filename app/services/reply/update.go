@@ -6,6 +6,7 @@ import (
 	"github.com/Southclaws/fault"
 	"github.com/Southclaws/fault/fctx"
 	"github.com/Southclaws/fault/fmsg"
+	"github.com/Southclaws/opt"
 	"github.com/rs/xid"
 
 	"github.com/Southclaws/storyden/app/resources/datagraph"
@@ -53,6 +54,16 @@ func (s *Mutator) Update(ctx context.Context, replyID post.ID, partial Partial) 
 		userSetVisibility = true
 	}
 
+	if c, ok := partial.Content.Get(); ok {
+		prev := p.Content
+		stable, err := datagraph.NewRichTextWithChangedBlocks(prev, c)
+		if err != nil {
+			s.logger.Warn("block ID assignment failed", "error", err.Error())
+		} else {
+			partial.Content = opt.New(stable.Content)
+		}
+	}
+
 	oldVisibility := p.Visibility
 	opts := partial.Opts()
 
@@ -78,6 +89,10 @@ func (s *Mutator) Update(ctx context.Context, replyID post.ID, partial Partial) 
 
 	p, err = s.replyWriter.Update(ctx, replyID, opts...)
 	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+
+	if err := s.cache.Invalidate(ctx, xid.ID(pref.RootPostID)); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
