@@ -7,8 +7,9 @@
  *
  * OpenAPI spec version: v1.26.15-post
  */
+import type { RobotSessionStreamEvent } from "./robotSessionStreamEvent";
 
-export interface RobotSessionStreamReference {
-  /** Relative URL of the Robot turn stream. */
-  streamUrl: string;
-}
+/**
+ * Persisted Robot session events, optionally followed by a live SSE tail.
+ */
+export type RobotSessionStreamReadResponse = RobotSessionStreamEvent[] | string;

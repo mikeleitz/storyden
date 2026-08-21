@@ -6,14 +6,18 @@ import { StorydenUIMessage, toStorydenUIMessages } from "@/api/robots-types";
 export function useChatSessionState(initialSessionID?: string) {
   const [sessionState, setSessionState] = useState<{
     id: string | undefined;
+    activeTurnID: string | undefined;
     activeWorkspaceID: string | undefined;
     messages: StorydenUIMessage[] | undefined;
     nextBefore: string | undefined;
+    streamOffset: string | undefined;
   }>({
     id: undefined,
+    activeTurnID: undefined,
     activeWorkspaceID: undefined,
     messages: undefined,
     nextBefore: undefined,
+    streamOffset: undefined,
   });
 
   const [loadingState, setLoadingState] = useState<{
@@ -28,9 +32,11 @@ export function useChatSessionState(initialSessionID?: string) {
     if (!initialSessionID) {
       setSessionState({
         id: undefined,
+        activeTurnID: undefined,
         activeWorkspaceID: undefined,
         messages: undefined,
         nextBefore: undefined,
+        streamOffset: undefined,
       });
       setLoadingState({ isLoading: false, error: undefined });
       return;
@@ -43,18 +49,22 @@ export function useChatSessionState(initialSessionID?: string) {
         const messages = toStorydenUIMessages(session.message_list.messages);
         setSessionState({
           id,
+          activeTurnID: session.active_turn_id,
           activeWorkspaceID: session.active_workspace?.workspace_id,
           messages,
           nextBefore: session.message_list.next_before,
+          streamOffset: session.stream_offset,
         });
         setLoadingState({ isLoading: false, error: undefined });
       } catch (error) {
         setLoadingState({ isLoading: false, error });
         setSessionState({
           id: undefined,
+          activeTurnID: undefined,
           activeWorkspaceID: undefined,
           messages: undefined,
           nextBefore: undefined,
+          streamOffset: undefined,
         });
       }
     }

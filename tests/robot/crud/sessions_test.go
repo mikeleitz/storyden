@@ -48,12 +48,13 @@ func startSession(t *testing.T, ctx context.Context, ts *httptest.Server, sessio
 		robotIDPtr = &robotID
 	}
 
+	messageID := xid.New().String()
 	body, err := json.Marshal(openapi.RobotChatRequest{
 		Id:        sessionID,
 		SessionId: &sessionID,
 		RobotId:   robotIDPtr,
 		Messages: []openapi.UIMessage{{
-			Id:    xid.New().String(),
+			Id:    messageID,
 			Role:  openapi.UIMessageRoleUser,
 			Parts: []openapi.UIMessagePart{textPart},
 		}},
@@ -68,12 +69,29 @@ func startSession(t *testing.T, ctx context.Context, ts *httptest.Server, sessio
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
 	location := resp.Header.Get("Location")
 	require.NotEmpty(t, location)
 
-	_, err = robot.ReadDurableJSON[openapi.StreamPart](ctx, ts.URL+location, session)
+	var turnID string
+	_, err = robot.ReadDurableJSONUntil[openapi.RobotSessionStreamEvent](ctx, ts.URL+location, session, "-1", func(event openapi.RobotSessionStreamEvent) bool {
+		if turnID == "" && event.InputIds != nil {
+			for _, inputID := range *event.InputIds {
+				if string(inputID) == messageID && event.TurnId != nil {
+					turnID = string(*event.TurnId)
+					break
+				}
+			}
+		}
+		if turnID == "" || event.TurnId == nil || string(*event.TurnId) != turnID {
+			return false
+		}
+		return event.EventKind == openapi.TurnCompleted ||
+			event.EventKind == openapi.TurnBlocked ||
+			event.EventKind == openapi.TurnFailed ||
+			event.EventKind == openapi.TurnCancelled
+	})
 	require.NoError(t, err)
 
 	return sessionID

@@ -29,6 +29,9 @@ type ToolDefinition struct {
 	Description          string
 	InputSchema          *jsonschema.Schema
 	OutputSchema         *jsonschema.Schema
+	Internal             bool
+	Toolsets             []string
+	ToolsetOnly          bool
 	RequiredPermission   opt.Optional[rbac.Permission]
 	RequiresConfirmation bool
 	RequiresWorkspace    bool
@@ -188,11 +191,25 @@ func initTool(name string) *ToolDefinition {
 
 	var requiredPermission opt.Optional[rbac.Permission]
 	var displayTitle string
+	var internal bool
+	var toolsets []string
+	var toolsetOnly bool
 	var requiresConfirmation bool
 	var requiresWorkspace bool
 	var annotations ToolAnnotations
 
 	if toolDef.Extra != nil {
+		if ext, ok := toolDef.Extra["x-storyden"].(map[string]any); ok {
+			internal, _ = ext["internal"].(bool)
+			toolsetOnly, _ = ext["toolset_only"].(bool)
+			if values, ok := ext["toolsets"].([]any); ok {
+				for _, value := range values {
+					if toolset, ok := value.(string); ok {
+						toolsets = append(toolsets, toolset)
+					}
+				}
+			}
+		}
 		if ext, ok := toolDef.Extra["x-storyden-tool"].(map[string]any); ok {
 			if roleStr, ok := ext["role"].(string); ok {
 				r, err := rbac.NewPermission(roleStr)
@@ -221,6 +238,9 @@ func initTool(name string) *ToolDefinition {
 		Description:          description,
 		InputSchema:          inputSchema,
 		OutputSchema:         outputSchema,
+		Internal:             internal,
+		Toolsets:             toolsets,
+		ToolsetOnly:          toolsetOnly,
 		RequiredPermission:   requiredPermission,
 		RequiresConfirmation: requiresConfirmation,
 		RequiresWorkspace:    requiresWorkspace,

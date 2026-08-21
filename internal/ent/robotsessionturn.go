@@ -43,6 +43,8 @@ type RobotSessionTurn struct {
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	// FinishedAt holds the value of the "finished_at" field.
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	// Set when a member explicitly requests cancellation of this turn.
+	CancelRequestedAt *time.Time `json:"cancel_requested_at,omitempty"`
 	// ErrorText holds the value of the "error_text" field.
 	ErrorText *string `json:"error_text,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -57,9 +59,11 @@ type RobotSessionTurnEdges struct {
 	Session *RobotSession `json:"session,omitempty"`
 	// Initiator holds the value of the initiator edge.
 	Initiator *Account `json:"initiator,omitempty"`
+	// Inputs holds the value of the inputs edge.
+	Inputs []*RobotSessionInput `json:"inputs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // SessionOrErr returns the Session value or an error if the edge
@@ -84,6 +88,15 @@ func (e RobotSessionTurnEdges) InitiatorOrErr() (*Account, error) {
 	return nil, &NotLoadedError{edge: "initiator"}
 }
 
+// InputsOrErr returns the Inputs value or an error if the edge
+// was not loaded in eager-loading.
+func (e RobotSessionTurnEdges) InputsOrErr() ([]*RobotSessionInput, error) {
+	if e.loadedTypes[2] {
+		return e.Inputs, nil
+	}
+	return nil, &NotLoadedError{edge: "inputs"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*RobotSessionTurn) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -95,7 +108,7 @@ func (*RobotSessionTurn) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case robotsessionturn.FieldSourceKind, robotsessionturn.FieldRobotRef, robotsessionturn.FieldStatus, robotsessionturn.FieldErrorText:
 			values[i] = new(sql.NullString)
-		case robotsessionturn.FieldCreatedAt, robotsessionturn.FieldUpdatedAt, robotsessionturn.FieldStartedAt, robotsessionturn.FieldFinishedAt:
+		case robotsessionturn.FieldCreatedAt, robotsessionturn.FieldUpdatedAt, robotsessionturn.FieldStartedAt, robotsessionturn.FieldFinishedAt, robotsessionturn.FieldCancelRequestedAt:
 			values[i] = new(sql.NullTime)
 		case robotsessionturn.FieldID, robotsessionturn.FieldSessionID:
 			values[i] = new(xid.ID)
@@ -192,6 +205,13 @@ func (_m *RobotSessionTurn) assignValues(columns []string, values []any) error {
 				_m.FinishedAt = new(time.Time)
 				*_m.FinishedAt = value.Time
 			}
+		case robotsessionturn.FieldCancelRequestedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_requested_at", values[i])
+			} else if value.Valid {
+				_m.CancelRequestedAt = new(time.Time)
+				*_m.CancelRequestedAt = value.Time
+			}
 		case robotsessionturn.FieldErrorText:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field error_text", values[i])
@@ -220,6 +240,11 @@ func (_m *RobotSessionTurn) QuerySession() *RobotSessionQuery {
 // QueryInitiator queries the "initiator" edge of the RobotSessionTurn entity.
 func (_m *RobotSessionTurn) QueryInitiator() *AccountQuery {
 	return NewRobotSessionTurnClient(_m.config).QueryInitiator(_m)
+}
+
+// QueryInputs queries the "inputs" edge of the RobotSessionTurn entity.
+func (_m *RobotSessionTurn) QueryInputs() *RobotSessionInputQuery {
+	return NewRobotSessionTurnClient(_m.config).QueryInputs(_m)
 }
 
 // Update returns a builder for updating this RobotSessionTurn.
@@ -283,6 +308,11 @@ func (_m *RobotSessionTurn) String() string {
 	builder.WriteString(", ")
 	if v := _m.FinishedAt; v != nil {
 		builder.WriteString("finished_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelRequestedAt; v != nil {
+		builder.WriteString("cancel_requested_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

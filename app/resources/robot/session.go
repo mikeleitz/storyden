@@ -3,6 +3,7 @@ package robot
 import (
 	"github.com/Southclaws/dt"
 	"github.com/Southclaws/fault"
+	"github.com/Southclaws/opt"
 	"github.com/rs/xid"
 
 	"github.com/Southclaws/storyden/app/resources/account"
@@ -26,8 +27,10 @@ func NewSessionID(s string) (SessionID, error) {
 
 type Session struct {
 	session_ref.Ref
-	Messages Messages
-	State    map[string]any
+	Messages      Messages
+	State         map[string]any
+	EventSequence uint64
+	ActiveTurnID  opt.Optional[TurnID]
 }
 
 func MapSession(s *ent.RobotSession, messages []*ent.RobotSessionMessage) (*Session, error) {
@@ -49,8 +52,12 @@ func MapSession(s *ent.RobotSession, messages []*ent.RobotSessionMessage) (*Sess
 			UpdatedAt: s.UpdatedAt,
 			Human:     *user,
 		},
-		Messages: mappedMessages,
-		State:    s.State,
+		Messages:      mappedMessages,
+		State:         s.State,
+		EventSequence: s.NextEventSequence,
+		ActiveTurnID: opt.Map(opt.NewPtr(s.ActiveTurnID), func(id xid.ID) TurnID {
+			return TurnID(id)
+		}),
 	}, nil
 }
 

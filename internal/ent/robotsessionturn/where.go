@@ -101,6 +101,11 @@ func FinishedAt(v time.Time) predicate.RobotSessionTurn {
 	return predicate.RobotSessionTurn(sql.FieldEQ(FieldFinishedAt, v))
 }
 
+// CancelRequestedAt applies equality check predicate on the "cancel_requested_at" field. It's identical to CancelRequestedAtEQ.
+func CancelRequestedAt(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldEQ(FieldCancelRequestedAt, v))
+}
+
 // ErrorText applies equality check predicate on the "error_text" field. It's identical to ErrorTextEQ.
 func ErrorText(v string) predicate.RobotSessionTurn {
 	return predicate.RobotSessionTurn(sql.FieldEQ(FieldErrorText, v))
@@ -676,6 +681,56 @@ func FinishedAtNotNil() predicate.RobotSessionTurn {
 	return predicate.RobotSessionTurn(sql.FieldNotNull(FieldFinishedAt))
 }
 
+// CancelRequestedAtEQ applies the EQ predicate on the "cancel_requested_at" field.
+func CancelRequestedAtEQ(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldEQ(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtNEQ applies the NEQ predicate on the "cancel_requested_at" field.
+func CancelRequestedAtNEQ(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldNEQ(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtIn applies the In predicate on the "cancel_requested_at" field.
+func CancelRequestedAtIn(vs ...time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldIn(FieldCancelRequestedAt, vs...))
+}
+
+// CancelRequestedAtNotIn applies the NotIn predicate on the "cancel_requested_at" field.
+func CancelRequestedAtNotIn(vs ...time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldNotIn(FieldCancelRequestedAt, vs...))
+}
+
+// CancelRequestedAtGT applies the GT predicate on the "cancel_requested_at" field.
+func CancelRequestedAtGT(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldGT(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtGTE applies the GTE predicate on the "cancel_requested_at" field.
+func CancelRequestedAtGTE(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldGTE(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtLT applies the LT predicate on the "cancel_requested_at" field.
+func CancelRequestedAtLT(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldLT(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtLTE applies the LTE predicate on the "cancel_requested_at" field.
+func CancelRequestedAtLTE(v time.Time) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldLTE(FieldCancelRequestedAt, v))
+}
+
+// CancelRequestedAtIsNil applies the IsNil predicate on the "cancel_requested_at" field.
+func CancelRequestedAtIsNil() predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldIsNull(FieldCancelRequestedAt))
+}
+
+// CancelRequestedAtNotNil applies the NotNil predicate on the "cancel_requested_at" field.
+func CancelRequestedAtNotNil() predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(sql.FieldNotNull(FieldCancelRequestedAt))
+}
+
 // ErrorTextEQ applies the EQ predicate on the "error_text" field.
 func ErrorTextEQ(v string) predicate.RobotSessionTurn {
 	return predicate.RobotSessionTurn(sql.FieldEQ(FieldErrorText, v))
@@ -789,6 +844,29 @@ func HasInitiator() predicate.RobotSessionTurn {
 func HasInitiatorWith(preds ...predicate.Account) predicate.RobotSessionTurn {
 	return predicate.RobotSessionTurn(func(s *sql.Selector) {
 		step := newInitiatorStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasInputs applies the HasEdge predicate on the "inputs" edge.
+func HasInputs() predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, InputsTable, InputsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasInputsWith applies the HasEdge predicate on the "inputs" edge with a given conditions (other predicates).
+func HasInputsWith(preds ...predicate.RobotSessionInput) predicate.RobotSessionTurn {
+	return predicate.RobotSessionTurn(func(s *sql.Selector) {
+		step := newInputsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

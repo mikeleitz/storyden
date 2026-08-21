@@ -7,9 +7,8 @@
  *
  * OpenAPI spec version: v1.26.15-post
  */
-import type { RobotSessionStreamReference } from "./robotSessionStreamReference";
 
 /**
- * Robot turn started.
+ * Current Robot session stream state.
  */
-export type RobotSessionStreamCreatedResponse = RobotSessionStreamReference;
+export type RobotSessionStreamMetadataResponse = void;

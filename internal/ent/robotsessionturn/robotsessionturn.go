@@ -38,12 +38,16 @@ const (
 	FieldStartedAt = "started_at"
 	// FieldFinishedAt holds the string denoting the finished_at field in the database.
 	FieldFinishedAt = "finished_at"
+	// FieldCancelRequestedAt holds the string denoting the cancel_requested_at field in the database.
+	FieldCancelRequestedAt = "cancel_requested_at"
 	// FieldErrorText holds the string denoting the error_text field in the database.
 	FieldErrorText = "error_text"
 	// EdgeSession holds the string denoting the session edge name in mutations.
 	EdgeSession = "session"
 	// EdgeInitiator holds the string denoting the initiator edge name in mutations.
 	EdgeInitiator = "initiator"
+	// EdgeInputs holds the string denoting the inputs edge name in mutations.
+	EdgeInputs = "inputs"
 	// Table holds the table name of the robotsessionturn in the database.
 	Table = "robot_session_turns"
 	// SessionTable is the table that holds the session relation/edge.
@@ -60,6 +64,13 @@ const (
 	InitiatorInverseTable = "accounts"
 	// InitiatorColumn is the table column denoting the initiator relation/edge.
 	InitiatorColumn = "initiated_by_account_id"
+	// InputsTable is the table that holds the inputs relation/edge.
+	InputsTable = "robot_session_inputs"
+	// InputsInverseTable is the table name for the RobotSessionInput entity.
+	// It exists in this package in order to avoid circular dependency with the "robotsessioninput" package.
+	InputsInverseTable = "robot_session_inputs"
+	// InputsColumn is the table column denoting the inputs relation/edge.
+	InputsColumn = "turn_id"
 )
 
 // Columns holds all SQL columns for robotsessionturn fields.
@@ -76,6 +87,7 @@ var Columns = []string{
 	FieldContinuationOfTurnID,
 	FieldStartedAt,
 	FieldFinishedAt,
+	FieldCancelRequestedAt,
 	FieldErrorText,
 }
 
@@ -190,6 +202,11 @@ func ByFinishedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFinishedAt, opts...).ToFunc()
 }
 
+// ByCancelRequestedAt orders the results by the cancel_requested_at field.
+func ByCancelRequestedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelRequestedAt, opts...).ToFunc()
+}
+
 // ByErrorText orders the results by the error_text field.
 func ByErrorText(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldErrorText, opts...).ToFunc()
@@ -208,6 +225,20 @@ func ByInitiatorField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newInitiatorStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByInputsCount orders the results by inputs count.
+func ByInputsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newInputsStep(), opts...)
+	}
+}
+
+// ByInputs orders the results by inputs terms.
+func ByInputs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newInputsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newSessionStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -220,5 +251,12 @@ func newInitiatorStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InitiatorInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InitiatorTable, InitiatorColumn),
+	)
+}
+func newInputsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(InputsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, InputsTable, InputsColumn),
 	)
 }

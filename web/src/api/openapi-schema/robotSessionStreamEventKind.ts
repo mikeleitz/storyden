@@ -7,9 +7,16 @@
  *
  * OpenAPI spec version: v1.26.15-post
  */
-import type { RobotSessionStreamReference } from "./robotSessionStreamReference";
 
-/**
- * Resumable Robot turn stream located.
- */
-export type RobotSessionStreamFoundResponse = RobotSessionStreamReference;
+export type RobotSessionStreamEventKind =
+  (typeof RobotSessionStreamEventKind)[keyof typeof RobotSessionStreamEventKind];
+
+export const RobotSessionStreamEventKind = {
+  message: "message",
+  input_queued: "input_queued",
+  turn_queued: "turn_queued",
+  turn_completed: "turn_completed",
+  turn_blocked: "turn_blocked",
+  turn_failed: "turn_failed",
+  turn_cancelled: "turn_cancelled",
+} as const;

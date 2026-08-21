@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { ChatStatus, UIMessageChunk, readUIMessageStream } from "ai";
 import type { JSONSchema7 } from "json-schema";
 import {
   PropsWithChildren,
@@ -14,17 +15,26 @@ import {
 } from "react";
 import { useSWRConfig } from "swr";
 
-import { createDurableChatTransport } from "@/api/durable-chat-transport";
+import {
+  createDurableChatTransport,
+  observeRobotSession,
+} from "@/api/durable-chat-transport";
+import type { CommandAccepted } from "@/api/durable-chat-transport";
 import {
   getRobotToolsetsListKey,
   getRobotsListKey,
   robotSessionGet,
+  robotSessionTurnCancel,
   useRobotGet,
   useRobotSessionsList,
   useRobotWorkspacesList,
 } from "@/api/openapi-client/robots";
 import { getThreadListKey } from "@/api/openapi-client/threads";
-import { RobotSessionList, RobotWorkspaceList } from "@/api/openapi-schema";
+import {
+  RobotSessionList,
+  RobotSessionStreamEvent,
+  RobotWorkspaceList,
+} from "@/api/openapi-schema";
 import {
   TOOL_NAMES,
   ToolInputMap,
@@ -103,11 +113,15 @@ type RobotChatContextValue = {
   workspacesReady: boolean;
   sessions: RobotSessionList;
   sendMessage: (input: { text: string }) => Promise<void>;
+  cancelActiveTurn: () => Promise<void>;
+  canCancelActiveTurn: boolean;
+  isCancelling: boolean;
   messages: StorydenUIMessage[];
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
   loadOlderMessages: () => Promise<boolean>;
   status: ReturnType<typeof useChat>["status"];
+  queuedMessageCount: number;
   errorState?: string;
   handleDismissError: () => void;
   isSessionConfirmed: boolean;
@@ -137,6 +151,8 @@ type RobotChatContextProps = PropsWithChildren<{
   initialSessionID?: string;
   initialMessages?: StorydenUIMessage[];
   initialNextBefore?: string;
+  initialStreamOffset?: string;
+  initialActiveTurnID?: string;
   initialRootRobotID?: string;
   initialSelectedWorkspaceID?: string;
 }>;
@@ -146,6 +162,8 @@ export function RobotChatContext({
   initialSessionID,
   initialMessages,
   initialNextBefore,
+  initialStreamOffset,
+  initialActiveTurnID,
   initialRootRobotID,
   initialSelectedWorkspaceID,
 }: RobotChatContextProps) {
@@ -166,12 +184,18 @@ export function RobotChatContext({
   );
   const autoSubmittedToolOutputIDsRef = useRef<Set<string>>(new Set());
   const [sessionId] = useState(() => initialSessionID ?? generateXid());
+  const [streamStartOffset] = useState(initialStreamOffset ?? "-1");
   const [isSessionConfirmed, setIsSessionConfirmed] =
     useState(!!initialSessionID);
   const [nextBefore, setNextBefore] = useState<string | undefined>(
     initialNextBefore,
   );
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [observerStatus, setObserverStatus] = useState<ChatStatus>("ready");
+  const [activeTurnID, setActiveTurnID] = useState<string | undefined>(
+    initialActiveTurnID,
+  );
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const [errorState, setErrorState] = useState<string | undefined>(undefined);
   const getPageContext = useRobotPageContext();
@@ -197,8 +221,8 @@ export function RobotChatContext({
     }
   }, [handleSetSelectedWorkspaceID, selectedWorkspaceID, workspacesData]);
 
-  const transport = useMemo(() => {
-    const fetchClient: typeof fetch = async (input, init) => {
+  const fetchClient = useMemo<typeof fetch>(() => {
+    return async (input, init) => {
       let request: RequestInit = {
         ...init,
         credentials: "include",
@@ -226,12 +250,25 @@ export function RobotChatContext({
 
       return fetch(input, request);
     };
+  }, [getPageContext, rootRobotID, selectedWorkspaceID]);
 
+  const handleCommandAccepted = useCallback(
+    (command: CommandAccepted) => {
+      if (command.sessionId !== sessionId) {
+        return;
+      }
+      setIsSessionConfirmed(true);
+    },
+    [sessionId],
+  );
+
+  const transport = useMemo(() => {
     return createDurableChatTransport<StorydenUIMessage>({
       api: `${API_ADDRESS}/api/robots/sessions`,
       fetchClient,
+      onCommandAccepted: handleCommandAccepted,
     });
-  }, [getPageContext, rootRobotID, selectedWorkspaceID]);
+  }, [fetchClient, handleCommandAccepted]);
 
   const handleToolCall = useCallback(
     async ({ toolCall }: HandleToolCallOptions) => {
@@ -271,18 +308,8 @@ export function RobotChatContext({
     [mutate],
   );
 
-  const chat = useChat<StorydenUIMessage>({
-    id: sessionId,
-    messages: initialMessages,
-    transport,
-    resume: true,
-    onError: async (e) => {
-      console.error("[RobotChat] Chat error:", e);
-      setErrorState(deriveError(e));
-    },
-    onData: async (message) => {
-      console.debug(`[RobotChat] Session data`, message);
-
+  const handleStreamData = useCallback(
+    (message: { type: string; data: unknown }) => {
       switch (message.type) {
         case "data-session_id": {
           if (message.data === sessionId) {
@@ -291,38 +318,38 @@ export function RobotChatContext({
           break;
         }
         case "data-session_name": {
-          // Mark session as confirmed when we receive session name from backend
           setIsSessionConfirmed(true);
-
-          if (!sessionsData) return;
-
-          if (typeof message.data !== "string") return;
+          if (!sessionsData || typeof message.data !== "string") return;
 
           const sessionName = message.data;
           const newData = {
             ...sessionsData,
-            sessions: sessionsData?.sessions.map((r) => {
-              if (r.id === sessionId) {
-                if (r.name === sessionName) {
-                  return r;
-                }
-
-                console.debug(
-                  `[RobotChat] Session name updated: ${sessionName}`,
-                );
-
-                return {
-                  ...r,
-                  name: sessionName,
-                };
-              }
-              return r;
-            }),
+            sessions: sessionsData.sessions.map((session) =>
+              session.id === sessionId
+                ? { ...session, name: sessionName }
+                : session,
+            ),
           };
           mutateSessionList(newData, { revalidate: true });
           break;
         }
       }
+    },
+    [mutateSessionList, sessionId, sessionsData, setIsSessionConfirmed],
+  );
+
+  const chat = useChat<StorydenUIMessage>({
+    id: sessionId,
+    messages: initialMessages,
+    transport,
+    resume: false,
+    onError: async (e) => {
+      console.error("[RobotChat] Chat error:", e);
+      setErrorState(deriveError(e));
+    },
+    onData: async (message) => {
+      console.debug(`[RobotChat] Session data`, message);
+      handleStreamData(message);
     },
     onToolCall: async (p) => {
       try {
@@ -388,6 +415,153 @@ export function RobotChatContext({
     },
   });
 
+  const observerCallbacksRef = useRef({ handleStreamData, handleToolCall });
+  const setMessagesRef = useRef(chat.setMessages);
+  const observerFetchClient = useMemo<typeof fetch>(() => {
+    return (input, init) => fetch(input, { ...init, credentials: "include" });
+  }, []);
+
+  useEffect(() => {
+    observerCallbacksRef.current = { handleStreamData, handleToolCall };
+    setMessagesRef.current = chat.setMessages;
+  }, [chat.setMessages, handleStreamData, handleToolCall]);
+
+  useEffect(() => {
+    if (!isSessionConfirmed) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const consumers = new Map<string, TurnMessageConsumer>();
+    const queuedParts = new Map<string, UIMessageChunk[]>();
+    const handledToolCallIDs = new Set<string>();
+    const activeTurnIDs = new Set<string>();
+
+    const updateTurnMessage = (message: StorydenUIMessage) => {
+      setMessagesRef.current((messages) => upsertMessage(messages, message));
+      for (const part of message.parts) {
+        if (
+          !part.type.startsWith("tool-") ||
+          !("toolCallId" in part) ||
+          !part.toolCallId ||
+          !("state" in part) ||
+          part.state === "output-available" ||
+          part.state === "output-error" ||
+          part.state === "approval-responded" ||
+          handledToolCallIDs.has(part.toolCallId)
+        ) {
+          continue;
+        }
+        handledToolCallIDs.add(part.toolCallId);
+        void observerCallbacksRef.current
+          .handleToolCall({
+            toolCall: {
+              toolCallId: part.toolCallId,
+              toolName: part.type.replace(/^tool-/, ""),
+              input: "input" in part ? part.input : undefined,
+            },
+          })
+          .catch((error) => setErrorState(deriveError(error)));
+      }
+    };
+
+    const consumerFor = (turnID: string) => {
+      let consumer = consumers.get(turnID);
+      if (consumer) {
+        return consumer;
+      }
+      consumer = createTurnMessageConsumer(updateTurnMessage, (error) =>
+        setErrorState(deriveError(error)),
+      );
+      consumers.set(turnID, consumer);
+      for (const part of queuedParts.get(turnID) ?? []) {
+        consumer.push(part);
+      }
+      queuedParts.delete(turnID);
+      return consumer;
+    };
+
+    const handleEvent = (event: RobotSessionStreamEvent) => {
+      const turnID = event.turn_id;
+      const parts = event.parts as UIMessageChunk[];
+      for (const part of parts) {
+        if (part.type.startsWith("data-") && "data" in part) {
+          observerCallbacksRef.current.handleStreamData({
+            type: part.type,
+            data: part.data,
+          });
+        }
+        if (part.type === "error") {
+          setErrorState(part.errorText);
+        }
+      }
+
+      if (event.event_kind === "turn_queued") {
+        if (!turnID) return;
+        activeTurnIDs.add(turnID);
+        setActiveTurnID(turnID);
+        queuedParts.set(turnID, parts);
+        const claimedInputIDs = new Set(event.input_ids ?? []);
+        if (claimedInputIDs.size > 0) {
+          setMessagesRef.current((messages) =>
+            messages.map((message) =>
+              claimedInputIDs.has(message.id)
+                ? { ...message, queued: false }
+                : message,
+            ),
+          );
+        }
+        setObserverStatus("submitted");
+        return;
+      }
+
+      if (event.message) {
+        setMessagesRef.current((messages) =>
+          upsertMessage(messages, event.message as StorydenUIMessage),
+        );
+      } else if (parts.length > 0 && turnID) {
+        setObserverStatus("streaming");
+        const consumer = consumerFor(turnID);
+        for (const part of parts) {
+          consumer.push(part);
+        }
+      }
+
+      if (isTerminalSessionEvent(event)) {
+        if (!turnID) return;
+        activeTurnIDs.delete(turnID);
+        setActiveTurnID((active) => (active === turnID ? undefined : active));
+        setIsCancelling(false);
+        consumers.get(turnID)?.close();
+        consumers.delete(turnID);
+        queuedParts.delete(turnID);
+        setObserverStatus(activeTurnIDs.size === 0 ? "ready" : "streaming");
+      }
+    };
+
+    void consumeRobotSession(
+      {
+        url: `${API_ADDRESS}/api/robots/sessions/${sessionId}/stream`,
+        offset: streamStartOffset,
+        signal: abortController.signal,
+        fetchClient: observerFetchClient,
+      },
+      handleEvent,
+    ).catch((error) => {
+      if (!abortController.signal.aborted) {
+        setObserverStatus("error");
+        setErrorState(deriveError(error));
+      }
+    });
+
+    return () => {
+      abortController.abort();
+      for (const consumer of consumers.values()) {
+        consumer.close();
+      }
+    };
+  }, [isSessionConfirmed, observerFetchClient, sessionId, streamStartOffset]);
+
   const initialMessagesSignature = useMemo(
     () => messageListSignature(initialMessages),
     [initialMessages],
@@ -433,14 +607,22 @@ export function RobotChatContext({
     async (input: { text: string }) => {
       const pageContext = await getPageContext();
       const currentWorkspaceID = selectedWorkspaceIDRef.current;
-      await chat.sendMessage(input, {
-        body: {
-          context: pageContext,
-          workspace: currentWorkspaceID
-            ? { workspace_id: currentWorkspaceID }
-            : undefined,
+      await chat.sendMessage(
+        {
+          id: generateXid(),
+          role: "user",
+          parts: [{ type: "text", text: input.text }],
+          queued: true,
         },
-      });
+        {
+          body: {
+            context: pageContext,
+            workspace: currentWorkspaceID
+              ? { workspace_id: currentWorkspaceID }
+              : undefined,
+          },
+        },
+      );
     },
     [chat.sendMessage, getPageContext],
   );
@@ -492,6 +674,20 @@ export function RobotChatContext({
     nextBefore,
     sessionId,
   ]);
+
+  const cancelActiveTurn = useCallback(async () => {
+    if (!activeTurnID || isCancelling) {
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      await robotSessionTurnCancel(sessionId, activeTurnID);
+    } catch (error) {
+      setIsCancelling(false);
+      setErrorState(deriveError(error));
+    }
+  }, [activeTurnID, isCancelling, sessionId]);
 
   const resolveToolConfirmation = useCallback(
     async (input: {
@@ -556,11 +752,17 @@ export function RobotChatContext({
     workspacesReady: !!workspacesData,
     sessions: sessionsData?.sessions ?? [],
     sendMessage,
+    cancelActiveTurn,
+    canCancelActiveTurn: !!activeTurnID,
+    isCancelling,
     messages: chat.messages,
     hasOlderMessages: Boolean(nextBefore),
     isLoadingOlderMessages,
     loadOlderMessages,
-    status: chat.status,
+    status: observerStatus === "ready" ? chat.status : observerStatus,
+    queuedMessageCount: chat.messages.filter(
+      (message) => message.role === "user" && message.queued,
+    ).length,
     errorState,
     handleDismissError,
     isSessionConfirmed,
@@ -569,6 +771,86 @@ export function RobotChatContext({
   };
 
   return <context.Provider value={value}>{children}</context.Provider>;
+}
+
+type TurnMessageConsumer = {
+  push: (part: UIMessageChunk) => void;
+  close: () => void;
+};
+
+async function consumeRobotSession(
+  options: Parameters<typeof observeRobotSession>[0],
+  onEvent: (event: RobotSessionStreamEvent) => void,
+) {
+  const events = await observeRobotSession(options);
+  for await (const event of events) {
+    onEvent(event);
+  }
+}
+
+function createTurnMessageConsumer(
+  onMessage: (message: StorydenUIMessage) => void,
+  onError: (error: unknown) => void,
+): TurnMessageConsumer {
+  let controller: ReadableStreamDefaultController<UIMessageChunk> | undefined;
+  let closed = false;
+  const input = new ReadableStream<UIMessageChunk>({
+    start(streamController) {
+      controller = streamController;
+    },
+  });
+  const messages = readUIMessageStream<StorydenUIMessage>({
+    stream: input,
+    onError,
+    terminateOnError: true,
+  });
+  void (async () => {
+    try {
+      for await (const message of messages) {
+        onMessage(message);
+      }
+    } catch (error) {
+      onError(error);
+    }
+  })();
+
+  return {
+    push(part) {
+      if (!closed) {
+        controller?.enqueue(part);
+      }
+    },
+    close() {
+      if (!closed) {
+        closed = true;
+        controller?.close();
+      }
+    },
+  };
+}
+
+function upsertMessage(
+  messages: readonly StorydenUIMessage[],
+  incoming: StorydenUIMessage,
+) {
+  const existingIndex = messages.findIndex(
+    (message) => message.id === incoming.id,
+  );
+  if (existingIndex === -1) {
+    return [...messages, incoming];
+  }
+  return messages.map((message, index) =>
+    index === existingIndex ? incoming : message,
+  );
+}
+
+function isTerminalSessionEvent(event: RobotSessionStreamEvent) {
+  return (
+    event.event_kind === "turn_completed" ||
+    event.event_kind === "turn_blocked" ||
+    event.event_kind === "turn_failed" ||
+    event.event_kind === "turn_cancelled"
+  );
 }
 
 function messageListSignature(messages?: readonly StorydenUIMessage[]) {

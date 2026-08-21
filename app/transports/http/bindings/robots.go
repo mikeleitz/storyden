@@ -2,7 +2,6 @@ package bindings
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -140,6 +139,9 @@ func (r *Robots) RobotCreate(ctx context.Context, request openapi.RobotCreateReq
 			return nil, fault.Wrap(err, fctx.With(ctx), ftag.With(ftag.InvalidArgument))
 		}
 		if err := r.validateRobotToolsForCreate(directTools); err != nil {
+			return nil, fault.Wrap(err, fctx.With(ctx), ftag.With(ftag.InvalidArgument))
+		}
+		if err := r.toolsets.ValidateDirectTools(ctx, directTools, selectedToolsets); err != nil {
 			return nil, fault.Wrap(err, fctx.With(ctx), ftag.With(ftag.InvalidArgument))
 		}
 		opts = append(opts, robot_writer.WithTools(mapRobotToolNames(directTools)))
@@ -666,11 +668,6 @@ func (r *Robots) RobotSessionGet(ctx context.Context, request openapi.RobotSessi
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	activeTurn, activeErr := r.sessionRepo.ActiveTurn(ctx, sessionID)
-	if activeErr != nil && !errors.Is(activeErr, robot_session.ErrTurnNotFound) {
-		return nil, fault.Wrap(activeErr, fctx.With(ctx))
-	}
-
 	sess, cursor, err := r.sessionRepo.Get(ctx, robot.SessionID(sessionID), messageParams)
 	if err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
@@ -679,16 +676,15 @@ func (r *Robots) RobotSessionGet(ctx context.Context, request openapi.RobotSessi
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
-	if activeErr == nil {
-		if err := r.sessionRepo.SetResumeTurn(ctx, sessionID, accountID, &activeTurn); err != nil {
-			return nil, fault.Wrap(err, fctx.With(ctx))
-		}
-		cursor.Items = slices.DeleteFunc(cursor.Items, func(message *robot.Message) bool {
-			turnID, ok := message.TurnID.Get()
-			return ok && turnID == activeTurn && message.Event.Author != "user"
-		})
-		cursor.Results = len(cursor.Items)
-	} else if err := r.sessionRepo.SetResumeTurn(ctx, sessionID, accountID, nil); err != nil {
+	streamOffset, err := r.sessionRepo.SessionStreamOffset(ctx, sessionID, sess.EventSequence)
+	if err != nil {
+		return nil, fault.Wrap(err, fctx.With(ctx))
+	}
+	cursor.Items = slices.DeleteFunc(cursor.Items, func(message *robot.Message) bool {
+		return message.Sequence > streamOffset
+	})
+	cursor.Results = len(cursor.Items)
+	if err := r.sessionRepo.AcknowledgeSessionEvents(ctx, sessionID, accountID, streamOffset); err != nil {
 		return nil, fault.Wrap(err, fctx.With(ctx))
 	}
 
@@ -703,13 +699,17 @@ func (r *Robots) RobotSessionGet(ctx context.Context, request openapi.RobotSessi
 	}
 	return openapi.RobotSessionGet200JSONResponse{
 		RobotSessionGetOKJSONResponse: openapi.RobotSessionGetOKJSONResponse(openapi.RobotSession{
-			Id:              openapi.Identifier(sess.ID.String()),
+			Id: openapi.Identifier(sess.ID.String()),
+			ActiveTurnId: opt.PtrMap(sess.ActiveTurnID, func(id robot.TurnID) openapi.Identifier {
+				return openapi.Identifier(id.String())
+			}),
 			Name:            sess.Name,
 			CreatedAt:       sess.CreatedAt,
 			UpdatedAt:       sess.UpdatedAt,
 			CreatedBy:       serialiseProfileReferenceFromAccount(sess.Human),
 			RootRobotId:     robotservice.SessionRootRobotRef(sess.State).Ptr(),
 			ActiveWorkspace: serialiseRobotWorkspaceMountPtr(robotservice.WorkspaceMountFromState(sess.State).Ptr()),
+			StreamOffset:    formatStreamOffset(streamOffset),
 			MessageList: openapi.PaginatedRobotMessageList{
 				NextBefore: opt.PtrMap(cursor.NextBefore, func(id robot.MessageID) openapi.Identifier {
 					return openapi.Identifier(id.String())
@@ -1205,6 +1205,10 @@ func (r *Robots) validateToolNames(toolNames []string) error {
 	for _, name := range toolNames {
 		if !r.tools.HasTool(name) {
 			invalid = append(invalid, name)
+			continue
+		}
+		if err := r.tools.ValidateStandaloneTool(name); err != nil {
+			return err
 		}
 	}
 	if len(invalid) > 0 {
@@ -1273,6 +1277,7 @@ func serialiseRobotToolInfo(tool robot_tools.CatalogueTool) openapi.RobotToolInf
 		Available:            tool.Available,
 		RequiresConfirmation: tool.RequiresConfirmation,
 		RequiresWorkspace:    tool.RequiresWorkspace,
+		ToolsetOnly:          tool.ToolsetOnly,
 	}
 }
 
@@ -1538,6 +1543,7 @@ func serialiseRobotSessionMessage(m *robot.Message, hiddenToolCallIDs map[string
 		Role:           openapi.RobotSessionMessageRole(role),
 		Parts:          parts,
 		CreatedAt:      m.CreatedAt,
+		Queued:         m.Queued,
 		Robot:          serialiseRobotActorReference(m),
 		Author:         opt.Map(m.Author, func(a *account.Account) openapi.ProfileReference { return serialiseProfileReferenceFromAccount(*a) }).Ptr(),
 		Branch:         m.Branch.Ptr(),

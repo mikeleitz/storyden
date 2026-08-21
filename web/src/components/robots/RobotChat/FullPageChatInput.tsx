@@ -5,11 +5,20 @@ import { useRef, useState } from "react";
 import { useRobotChat } from "@/components/site/CommandPalette/RobotChat/RobotChatContext";
 import { RobotChatLoadingStatus } from "@/components/site/CommandPalette/RobotChat/RobotChatLoadingStatus";
 import { IconButton } from "@/components/ui/icon-button";
+import { CancelIcon } from "@/components/ui/icons/Cancel";
 import { DiscussionIcon } from "@/components/ui/icons/Discussion";
 import { HStack, LStack, styled } from "@/styled-system/jsx";
 
 export function FullPageChatInput() {
-  const { activeRobotName, sendMessage, status } = useRobotChat();
+  const {
+    activeRobotName,
+    sendMessage,
+    cancelActiveTurn,
+    canCancelActiveTurn,
+    isCancelling,
+    status,
+    queuedMessageCount,
+  } = useRobotChat();
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -17,7 +26,7 @@ export function FullPageChatInput() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!input.trim() || isBusy) return;
+    if (!input.trim()) return;
 
     const text = input.trim();
     setInput("");
@@ -28,7 +37,7 @@ export function FullPageChatInput() {
       textareaRef.current?.focus();
     } catch (err) {
       console.error("sendMessage failed", err);
-      setInput(text);
+      setInput((current) => current || text);
       // Also refocus on error
       textareaRef.current?.focus();
     }
@@ -50,6 +59,12 @@ export function FullPageChatInput() {
     >
       <LStack w="full" gap="1.5">
         <RobotChatLoadingStatus active={isBusy} robotName={activeRobotName} />
+        {queuedMessageCount > 0 && (
+          <styled.span color="text.muted" fontSize="xs">
+            {queuedMessageCount}{" "}
+            {queuedMessageCount === 1 ? "message" : "messages"} queued
+          </styled.span>
+        )}
         <HStack w="full" gap="2">
           <styled.textarea
             ref={textareaRef}
@@ -73,26 +88,26 @@ export function FullPageChatInput() {
               borderColor: "accent.solid",
               outline: "none",
             }}
-            _disabled={{
-              cursor: "not-allowed",
-            }}
-            disabled={isBusy}
-            style={
-              isBusy
-                ? {
-                    opacity: 0.5,
-                  }
-                : undefined
-            }
           />
           <IconButton
             aria-label="Send message"
             variant="subtle"
             type="submit"
-            disabled={isBusy || !input.trim()}
+            disabled={!input.trim()}
           >
             <DiscussionIcon />
           </IconButton>
+          {canCancelActiveTurn && (
+            <IconButton
+              aria-label="Cancel Robot response"
+              variant="subtle"
+              type="button"
+              loading={isCancelling}
+              onClick={() => void cancelActiveTurn()}
+            >
+              <CancelIcon />
+            </IconButton>
+          )}
         </HStack>
       </LStack>
     </styled.form>

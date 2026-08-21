@@ -74,6 +74,7 @@ type turnProjector struct {
 	collector          *partCollector
 	delegations        *delegationStream
 	projectionFinished bool
+	hasDelegatedEvents bool
 }
 
 func newTurnProjector(
@@ -96,10 +97,14 @@ func newTurnProjector(
 }
 
 func (p *turnProjector) project(event robot.SessionEvent, toolRegistry *tools.Registry) []openapi.StreamPart {
+	turnID, hasTurn := event.TurnID.Get()
+	if !hasTurn {
+		return []openapi.StreamPart{}
+	}
 	switch event.Kind {
 	case robot.SessionEventTurnQueued:
 		start := openapi.StreamPart{}
-		_ = start.FromStartPart(openapi.StartPart{MessageId: event.TurnID.String()})
+		_ = start.FromStartPart(openapi.StartPart{MessageId: turnID.String()})
 		_ = p.collector.Send(start)
 		_ = p.collector.Send(robotprojection.DataStreamPart("data-session_id", p.sessionID.String()))
 
@@ -113,18 +118,26 @@ func (p *turnProjector) project(event robot.SessionEvent, toolRegistry *tools.Re
 		}
 		adkEvent := &message.Event
 		if adkEvent.Author == "user" {
+			if adkEvent.LLMResponse.Content != nil {
+				for _, part := range adkEvent.LLMResponse.Content.Parts {
+					if part != nil && part.FunctionResponse != nil {
+						p.delegations.Complete(part.FunctionResponse)
+					}
+				}
+			}
 			break
 		}
 		if adkEvent.LLMResponse.Content == nil {
 			break
 		}
 		delegatedEvent := p.delegations.AppendEvent(adkEvent)
+		p.hasDelegatedEvents = p.hasDelegatedEvents || delegatedEvent
 		for partIndex, part := range adkEvent.LLMResponse.Content.Parts {
 			if part == nil {
 				continue
 			}
 			if !delegatedEvent {
-				presentationParts := robotprojection.PresentationPartStreamPartsDeterministic(adkEvent, part, fmt.Sprintf("%s-%d-%d", event.TurnID.String(), event.Sequence, partIndex))
+				presentationParts := robotprojection.PresentationPartStreamPartsDeterministic(adkEvent, part, fmt.Sprintf("%s-%d-%d", turnID.String(), event.Sequence, partIndex))
 				for _, presentationPart := range presentationParts {
 					_ = p.collector.Send(presentationPart)
 				}
@@ -162,6 +175,9 @@ func (p *turnProjector) project(event robot.SessionEvent, toolRegistry *tools.Re
 		}
 
 	case robot.SessionEventTurnCompleted:
+		if p.hasDelegatedEvents {
+			p.delegations.CompleteRunning()
+		}
 		if !p.projectionFinished {
 			if sess, _, err := p.sessions.Get(p.ctx, p.sessionID, robot.NewMessageCursorParams(opt.NewEmpty[robot.MessageID](), 1)); err == nil {
 				data := openapi.StreamPart{}
@@ -175,12 +191,15 @@ func (p *turnProjector) project(event robot.SessionEvent, toolRegistry *tools.Re
 	case robot.SessionEventTurnBlocked:
 		p.finish()
 
-	case robot.SessionEventTurnFailed, robot.SessionEventTurnCancelled:
+	case robot.SessionEventTurnFailed:
 		message := event.ErrorText.Or("Robot turn failed")
 		p.delegations.Fail(message)
 		errorPart := openapi.StreamPart{}
 		_ = errorPart.FromErrorPart(openapi.ErrorPart{ErrorText: message})
 		_ = p.collector.Send(errorPart)
+
+	case robot.SessionEventTurnCancelled:
+		p.finish()
 	}
 	return p.collector.take()
 }
@@ -199,6 +218,149 @@ type projectedRead struct {
 	parts      []openapi.StreamPart
 	nextOffset uint64
 	closed     bool
+}
+
+type sessionProjector struct {
+	ctx          context.Context
+	logger       *slog.Logger
+	sessions     *robot_session.Repository
+	robotQuerier *robot_querier.Querier
+	toolRegistry *tools.Registry
+	sessionID    robot.SessionID
+	turns        map[robot.TurnID]*turnProjector
+}
+
+func newSessionProjector(
+	ctx context.Context,
+	logger *slog.Logger,
+	sessions *robot_session.Repository,
+	robotQuerier *robot_querier.Querier,
+	toolRegistry *tools.Registry,
+	sessionID robot.SessionID,
+) *sessionProjector {
+	return &sessionProjector{
+		ctx:          ctx,
+		logger:       logger,
+		sessions:     sessions,
+		robotQuerier: robotQuerier,
+		toolRegistry: toolRegistry,
+		sessionID:    sessionID,
+		turns:        map[robot.TurnID]*turnProjector{},
+	}
+}
+
+func (p *sessionProjector) project(event robot.SessionEvent) (openapi.RobotSessionStreamEvent, error) {
+	turnID, hasTurn := event.TurnID.Get()
+	var parts []openapi.StreamPart
+	if hasTurn {
+		projector := p.turns[turnID]
+		if projector == nil {
+			projector = newTurnProjector(p.ctx, p.logger, p.sessions, p.robotQuerier, p.toolRegistry, p.sessionID)
+			p.turns[turnID] = projector
+		}
+		parts = projector.project(event, p.toolRegistry)
+	}
+	if parts == nil {
+		parts = []openapi.StreamPart{}
+	}
+	streamEvent := openapi.RobotSessionStreamEvent{
+		Sequence:  event.Sequence,
+		EventKind: openapi.RobotSessionStreamEventKind(event.Kind),
+		Parts:     parts,
+	}
+	if hasTurn {
+		id := openapi.Identifier(turnID.String())
+		streamEvent.TurnId = &id
+	}
+	if len(event.InputIDs) > 0 {
+		ids := make([]openapi.Identifier, len(event.InputIDs))
+		for i, inputID := range event.InputIDs {
+			ids[i] = openapi.Identifier(inputID.String())
+		}
+		streamEvent.InputIds = &ids
+	}
+	if message, ok := event.Message.Get(); ok && event.Kind == robot.SessionEventInputQueued {
+		serialised, err := serialiseRobotSessionMessage(message, map[string]bool{}, robotprojection.ToolMetadataFromRegistry(p.ctx, p.toolRegistry))
+		if err != nil {
+			return openapi.RobotSessionStreamEvent{}, err
+		}
+		streamEvent.Message = &serialised
+	}
+
+	switch event.Kind {
+	case robot.SessionEventTurnCompleted, robot.SessionEventTurnBlocked, robot.SessionEventTurnFailed, robot.SessionEventTurnCancelled:
+		if hasTurn {
+			delete(p.turns, turnID)
+		}
+	}
+	return streamEvent, nil
+}
+
+type projectedSessionRead struct {
+	events     []openapi.RobotSessionStreamEvent
+	nextOffset uint64
+}
+
+func initialiseSessionProjection(
+	ctx context.Context,
+	logger *slog.Logger,
+	sessions *robot_session.Repository,
+	robotQuerier *robot_querier.Querier,
+	toolRegistry *tools.Registry,
+	sessionID robot.SessionID,
+	offset uint64,
+) (*sessionProjector, *projectedSessionRead, error) {
+	projector := newSessionProjector(ctx, logger, sessions, robotQuerier, toolRegistry, sessionID)
+	result := &projectedSessionRead{nextOffset: offset}
+	after := uint64(0)
+	for {
+		page, next, err := sessions.ReadSessionEvents(ctx, sessionID, after, robot.SessionEventPageSize)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, event := range page {
+			projected, err := projector.project(event)
+			if err != nil {
+				return nil, nil, err
+			}
+			if event.Sequence > offset {
+				result.events = append(result.events, projected)
+				result.nextOffset = event.Sequence
+			}
+		}
+		after = next
+		if len(page) < robot.SessionEventPageSize {
+			break
+		}
+	}
+	if offset > after {
+		return nil, nil, errInvalidStreamOffset
+	}
+	return projector, result, nil
+}
+
+func readProjectedSessionAfter(ctx context.Context, sessions *robot_session.Repository, projector *sessionProjector, sessionID robot.SessionID, offset uint64) (*projectedSessionRead, error) {
+	result := &projectedSessionRead{nextOffset: offset}
+	after := offset
+	for {
+		page, next, err := sessions.ReadSessionEvents(ctx, sessionID, after, robot.SessionEventPageSize)
+		if err != nil {
+			return nil, err
+		}
+		for _, event := range page {
+			projected, err := projector.project(event)
+			if err != nil {
+				return nil, err
+			}
+			result.events = append(result.events, projected)
+			result.nextOffset = event.Sequence
+		}
+		after = next
+		if len(page) < robot.SessionEventPageSize {
+			break
+		}
+	}
+	return result, nil
 }
 
 func readProjectedTurn(
@@ -298,6 +460,33 @@ func (r *Robots) RobotSessionTurnGet(ctx context.Context, request openapi.RobotS
 
 func (r *Robots) RobotSessionTurnHead(ctx context.Context, request openapi.RobotSessionTurnHeadRequestObject) (openapi.RobotSessionTurnHeadResponseObject, error) {
 	return robotSessionTurnHeadResponse{robots: r, ctx: ctx, request: request}, nil
+}
+
+func (r *Robots) RobotSessionTurnCancel(ctx context.Context, request openapi.RobotSessionTurnCancelRequestObject) (openapi.RobotSessionTurnCancelResponseObject, error) {
+	accountID, err := session.GetAccountID(ctx)
+	if err != nil {
+		return openapi.RobotSessionTurnCancel401Response{}, nil
+	}
+	sessionID, err := robot.NewSessionID(string(request.SessionId))
+	if err != nil {
+		return openapi.RobotSessionTurnCancel400Response{}, nil
+	}
+	turnXID, err := xid.FromString(string(request.TurnId))
+	if err != nil {
+		return openapi.RobotSessionTurnCancel400Response{}, nil
+	}
+	turnID := robot.TurnID(turnXID)
+	allowed, err := r.sessionRepo.CanReadTurn(ctx, sessionID, turnID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return openapi.RobotSessionTurnCancel404Response{}, nil
+	}
+	if err := r.coordinator.Cancel(ctx, sessionID, turnID); err != nil {
+		return nil, err
+	}
+	return openapi.RobotSessionTurnCancel202Response{}, nil
 }
 
 func (r *Robots) serveSessionTurn(ctx context.Context, w http.ResponseWriter, sessionValue, turnValue, offsetValue, live string, head bool) {
@@ -426,6 +615,103 @@ func serveDurableLive(ctx context.Context, w http.ResponseWriter, logger *slog.L
 	}
 }
 
+func serveSessionCatchUp(ctx context.Context, w http.ResponseWriter, logger *slog.Logger, sessions *robot_session.Repository, robotQuerier *robot_querier.Querier, toolRegistry *tools.Registry, sessionID robot.SessionID, offset uint64, head bool) {
+	_, result, err := initialiseSessionProjection(ctx, logger, sessions, robotQuerier, toolRegistry, sessionID, offset)
+	if err != nil {
+		writeDurableReadError(w, err, logger)
+		return
+	}
+	header := w.Header()
+	header.Set("Content-Type", streamContentTypeJSON)
+	header.Set("Cache-Control", headerNoCache)
+	header.Set(headerStreamNextOffset, formatStreamOffset(result.nextOffset))
+	header.Set(headerStreamUpToDate, "true")
+	if head {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	_, _ = w.Write(jsonBatch(result.events))
+}
+
+func serveSessionLive(ctx context.Context, w http.ResponseWriter, logger *slog.Logger, coordinator *session_coordinator.Coordinator, sessions *robot_session.Repository, robotQuerier *robot_querier.Querier, toolRegistry *tools.Registry, sessionID robot.SessionID, offset uint64) {
+	flusher, ok := GetFlusher(w)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	wake := make(chan struct{}, 1)
+	cursor := xid.New().String()
+	subscription, err := coordinator.SubscribeSession(ctx, sessionID.String(), "robot-session-reader-"+cursor, wake)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	defer subscription.Close()
+
+	projector, initial, err := initialiseSessionProjection(ctx, logger, sessions, robotQuerier, toolRegistry, sessionID, offset)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+			return
+		}
+		writeDurableReadError(w, err, logger)
+		return
+	}
+	header := w.Header()
+	header.Set("Content-Type", contentTypeEventStream)
+	header.Set("Cache-Control", headerNoCache)
+	header.Set("Connection", headerKeepAlive)
+	header.Set("X-Accel-Buffering", "no")
+	header.Set(headerStreamNextOffset, formatStreamOffset(offset))
+	header.Set(headerStreamCursor, cursor)
+	w.WriteHeader(http.StatusOK)
+	if len(initial.events) > 0 {
+		if _, err := fmt.Fprintf(w, "event: data\ndata: %s\n\n", jsonBatch(initial.events)); err != nil {
+			return
+		}
+	}
+	offset = initial.nextOffset
+	if err := writeDurableControl(w, durableControlEvent{StreamNextOffset: formatStreamOffset(offset), StreamCursor: cursor, UpToDate: true}); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	keepAlive := time.NewTicker(streamKeepAlivePeriod)
+	defer keepAlive.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-wake:
+		case <-keepAlive.C:
+			if _, err := w.Write([]byte(": keepalive\n\n")); err != nil {
+				return
+			}
+			flusher.Flush()
+			continue
+		}
+
+		result, err := readProjectedSessionAfter(ctx, sessions, projector, sessionID, offset)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				return
+			}
+			logger.Error("Robot session stream read", slog.String("error", err.Error()))
+			return
+		}
+		if len(result.events) == 0 {
+			continue
+		}
+		if _, err := fmt.Fprintf(w, "event: data\ndata: %s\n\n", jsonBatch(result.events)); err != nil {
+			return
+		}
+		offset = result.nextOffset
+		if err := writeDurableControl(w, durableControlEvent{StreamNextOffset: formatStreamOffset(offset), StreamCursor: cursor, UpToDate: true}); err != nil {
+			return
+		}
+		flusher.Flush()
+	}
+}
+
 func writeDurableControl(w http.ResponseWriter, control durableControlEvent) error {
 	data, err := json.Marshal(control)
 	if err != nil {
@@ -435,7 +721,7 @@ func writeDurableControl(w http.ResponseWriter, control durableControlEvent) err
 	return err
 }
 
-func jsonBatch(parts []openapi.StreamPart) []byte {
+func jsonBatch[T any](parts []T) []byte {
 	var body bytes.Buffer
 	body.WriteByte('[')
 	for i, part := range parts {

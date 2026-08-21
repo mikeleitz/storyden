@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Southclaws/storyden/internal/ent/account"
 	"github.com/Southclaws/storyden/internal/ent/robotsession"
+	"github.com/Southclaws/storyden/internal/ent/robotsessioninput"
 	"github.com/Southclaws/storyden/internal/ent/robotsessionturn"
 	"github.com/rs/xid"
 )
@@ -149,6 +150,20 @@ func (_c *RobotSessionTurnCreate) SetNillableFinishedAt(v *time.Time) *RobotSess
 	return _c
 }
 
+// SetCancelRequestedAt sets the "cancel_requested_at" field.
+func (_c *RobotSessionTurnCreate) SetCancelRequestedAt(v time.Time) *RobotSessionTurnCreate {
+	_c.mutation.SetCancelRequestedAt(v)
+	return _c
+}
+
+// SetNillableCancelRequestedAt sets the "cancel_requested_at" field if the given value is not nil.
+func (_c *RobotSessionTurnCreate) SetNillableCancelRequestedAt(v *time.Time) *RobotSessionTurnCreate {
+	if v != nil {
+		_c.SetCancelRequestedAt(*v)
+	}
+	return _c
+}
+
 // SetErrorText sets the "error_text" field.
 func (_c *RobotSessionTurnCreate) SetErrorText(v string) *RobotSessionTurnCreate {
 	_c.mutation.SetErrorText(v)
@@ -199,6 +214,21 @@ func (_c *RobotSessionTurnCreate) SetNillableInitiatorID(id *xid.ID) *RobotSessi
 // SetInitiator sets the "initiator" edge to the Account entity.
 func (_c *RobotSessionTurnCreate) SetInitiator(v *Account) *RobotSessionTurnCreate {
 	return _c.SetInitiatorID(v.ID)
+}
+
+// AddInputIDs adds the "inputs" edge to the RobotSessionInput entity by IDs.
+func (_c *RobotSessionTurnCreate) AddInputIDs(ids ...xid.ID) *RobotSessionTurnCreate {
+	_c.mutation.AddInputIDs(ids...)
+	return _c
+}
+
+// AddInputs adds the "inputs" edges to the RobotSessionInput entity.
+func (_c *RobotSessionTurnCreate) AddInputs(v ...*RobotSessionInput) *RobotSessionTurnCreate {
+	ids := make([]xid.ID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddInputIDs(ids...)
 }
 
 // Mutation returns the RobotSessionTurnMutation object of the builder.
@@ -359,6 +389,10 @@ func (_c *RobotSessionTurnCreate) createSpec() (*RobotSessionTurn, *sqlgraph.Cre
 		_spec.SetField(robotsessionturn.FieldFinishedAt, field.TypeTime, value)
 		_node.FinishedAt = &value
 	}
+	if value, ok := _c.mutation.CancelRequestedAt(); ok {
+		_spec.SetField(robotsessionturn.FieldCancelRequestedAt, field.TypeTime, value)
+		_node.CancelRequestedAt = &value
+	}
 	if value, ok := _c.mutation.ErrorText(); ok {
 		_spec.SetField(robotsessionturn.FieldErrorText, field.TypeString, value)
 		_node.ErrorText = &value
@@ -395,6 +429,22 @@ func (_c *RobotSessionTurnCreate) createSpec() (*RobotSessionTurn, *sqlgraph.Cre
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.InitiatedByAccountID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.InputsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   robotsessionturn.InputsTable,
+			Columns: []string{robotsessionturn.InputsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(robotsessioninput.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -596,6 +646,24 @@ func (u *RobotSessionTurnUpsert) UpdateFinishedAt() *RobotSessionTurnUpsert {
 // ClearFinishedAt clears the value of the "finished_at" field.
 func (u *RobotSessionTurnUpsert) ClearFinishedAt() *RobotSessionTurnUpsert {
 	u.SetNull(robotsessionturn.FieldFinishedAt)
+	return u
+}
+
+// SetCancelRequestedAt sets the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsert) SetCancelRequestedAt(v time.Time) *RobotSessionTurnUpsert {
+	u.Set(robotsessionturn.FieldCancelRequestedAt, v)
+	return u
+}
+
+// UpdateCancelRequestedAt sets the "cancel_requested_at" field to the value that was provided on create.
+func (u *RobotSessionTurnUpsert) UpdateCancelRequestedAt() *RobotSessionTurnUpsert {
+	u.SetExcluded(robotsessionturn.FieldCancelRequestedAt)
+	return u
+}
+
+// ClearCancelRequestedAt clears the value of the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsert) ClearCancelRequestedAt() *RobotSessionTurnUpsert {
+	u.SetNull(robotsessionturn.FieldCancelRequestedAt)
 	return u
 }
 
@@ -840,6 +908,27 @@ func (u *RobotSessionTurnUpsertOne) UpdateFinishedAt() *RobotSessionTurnUpsertOn
 func (u *RobotSessionTurnUpsertOne) ClearFinishedAt() *RobotSessionTurnUpsertOne {
 	return u.Update(func(s *RobotSessionTurnUpsert) {
 		s.ClearFinishedAt()
+	})
+}
+
+// SetCancelRequestedAt sets the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsertOne) SetCancelRequestedAt(v time.Time) *RobotSessionTurnUpsertOne {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.SetCancelRequestedAt(v)
+	})
+}
+
+// UpdateCancelRequestedAt sets the "cancel_requested_at" field to the value that was provided on create.
+func (u *RobotSessionTurnUpsertOne) UpdateCancelRequestedAt() *RobotSessionTurnUpsertOne {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.UpdateCancelRequestedAt()
+	})
+}
+
+// ClearCancelRequestedAt clears the value of the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsertOne) ClearCancelRequestedAt() *RobotSessionTurnUpsertOne {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.ClearCancelRequestedAt()
 	})
 }
 
@@ -1254,6 +1343,27 @@ func (u *RobotSessionTurnUpsertBulk) UpdateFinishedAt() *RobotSessionTurnUpsertB
 func (u *RobotSessionTurnUpsertBulk) ClearFinishedAt() *RobotSessionTurnUpsertBulk {
 	return u.Update(func(s *RobotSessionTurnUpsert) {
 		s.ClearFinishedAt()
+	})
+}
+
+// SetCancelRequestedAt sets the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsertBulk) SetCancelRequestedAt(v time.Time) *RobotSessionTurnUpsertBulk {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.SetCancelRequestedAt(v)
+	})
+}
+
+// UpdateCancelRequestedAt sets the "cancel_requested_at" field to the value that was provided on create.
+func (u *RobotSessionTurnUpsertBulk) UpdateCancelRequestedAt() *RobotSessionTurnUpsertBulk {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.UpdateCancelRequestedAt()
+	})
+}
+
+// ClearCancelRequestedAt clears the value of the "cancel_requested_at" field.
+func (u *RobotSessionTurnUpsertBulk) ClearCancelRequestedAt() *RobotSessionTurnUpsertBulk {
+	return u.Update(func(s *RobotSessionTurnUpsert) {
+		s.ClearCancelRequestedAt()
 	})
 }
 

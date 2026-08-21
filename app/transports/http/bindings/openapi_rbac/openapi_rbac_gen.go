@@ -238,8 +238,10 @@ type OperationPermissions interface {
 	RobotSessionCreate() (bool, *rbac.Permission)
 	RobotSessionsList() (bool, *rbac.Permission)
 	RobotSessionStream() (bool, *rbac.Permission)
+	RobotSessionStreamHead() (bool, *rbac.Permission)
 	RobotSessionTurnGet() (bool, *rbac.Permission)
 	RobotSessionTurnHead() (bool, *rbac.Permission)
+	RobotSessionTurnCancel() (bool, *rbac.Permission)
 	RobotSessionGet() (bool, *rbac.Permission)
 	RobotMCPServersList() (bool, *rbac.Permission)
 	RobotMCPServerCreate() (bool, *rbac.Permission)
@@ -722,10 +724,14 @@ func GetOperationPermission(optable OperationPermissions, op string) (bool, *rba
 		return optable.RobotSessionsList()
 	case "RobotSessionStream":
 		return optable.RobotSessionStream()
+	case "RobotSessionStreamHead":
+		return optable.RobotSessionStreamHead()
 	case "RobotSessionTurnGet":
 		return optable.RobotSessionTurnGet()
 	case "RobotSessionTurnHead":
 		return optable.RobotSessionTurnHead()
+	case "RobotSessionTurnCancel":
+		return optable.RobotSessionTurnCancel()
 	case "RobotSessionGet":
 		return optable.RobotSessionGet()
 	case "RobotMCPServersList":
