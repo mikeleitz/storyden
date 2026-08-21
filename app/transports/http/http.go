@@ -7,13 +7,10 @@
 package http
 
 import (
-	"net/http"
-
 	"go.uber.org/fx"
 
 	"github.com/Southclaws/storyden/app/transports/http/bindings"
 	"github.com/Southclaws/storyden/app/transports/http/middleware"
-	"github.com/Southclaws/storyden/internal/api"
 	"github.com/Southclaws/storyden/internal/infrastructure/httpserver"
 )
 
@@ -22,7 +19,6 @@ func Build() fx.Option {
 		// Builds the *http.ServeMux and *http.Server dependencies and, once set
 		// up, starts the server on the fx OnStart lifecycle event.
 		httpserver.Build(),
-		fx.Provide(api.NewAuthRoutes), // Add this line
 
 		// Build all middleware dependencies.
 		middleware.Build(),
@@ -31,14 +27,5 @@ func Build() fx.Option {
 		bindings.Build(),
 
 		fx.Invoke(MountOpenAPI),
-		fx.Invoke(mountAuthRoutes), // Add this line
 	)
-}
-
-// Add this new function
-func mountAuthRoutes(
-	mux *http.ServeMux,
-	authRoutes *api.AuthRoutes,
-) {
-	authRoutes.Mount(mux)
 }

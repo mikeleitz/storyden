@@ -35,11 +35,11 @@ func TestOAuthGitHubDuplicateAuthMethod(t *testing.T) {
 				identifierEmail := "email123"
 				emailAddr := mail.Address{Address: "unique@example.com"}
 
-				acc1, err := registrar.GetOrCreateViaEmail(root, service, authName, identifierEmail, token, "handleemail", "Email User", emailAddr)
+				acc1, err := registrar.GetOrCreateViaEmail(root, service, authName, identifierEmail, token, "handleemail", "Email User", emailAddr, false)
 				r.NoError(err)
 				r.NotNil(acc1)
 
-				acc2, err := registrar.GetOrCreateViaEmail(root, service, authName, identifierEmail, token, "handleemail", "Email User", emailAddr)
+				acc2, err := registrar.GetOrCreateViaEmail(root, service, authName, identifierEmail, token, "handleemail", "Email User", emailAddr, false)
 				r.NoError(err)
 				r.NotNil(acc2)
 				a.Equal(acc1.ID, acc2.ID)
